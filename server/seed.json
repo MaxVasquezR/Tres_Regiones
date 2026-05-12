@@ -1,0 +1,323 @@
+{
+  "platos": [
+    {
+      "id": 1,
+      "nombre": "Lomo saltado",
+      "descripcion": "Lomo fino salteado con cebolla morada, tomate y papas doradas. Servido con arroz.",
+      "precio": "S/ 28.00",
+      "categoria": "Clásicos",
+      "imagen": "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 2,
+      "nombre": "Ají de gallina",
+      "descripcion": "Pollo deshilachado en crema de ají amarillo, pecanas y papas sancochadas.",
+      "precio": "S/ 22.00",
+      "categoria": "Clásicos",
+      "imagen": "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 3,
+      "nombre": "Arroz con pato",
+      "descripcion": "Arroz verde norteño con confit de pato y salsa criolla al cilantro.",
+      "precio": "S/ 32.00",
+      "categoria": "Norte",
+      "imagen": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 4,
+      "nombre": "Causa limeña",
+      "descripcion": "Capas de papa amarilla, pollo en mayonesa de palta y huevo.",
+      "precio": "S/ 18.00",
+      "categoria": "Entradas",
+      "imagen": "https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 5,
+      "nombre": "Tiradito de pescado",
+      "descripcion": "Filete en leche de tigre de ají amarillo, chalaquita y maíz cancha.",
+      "precio": "S/ 26.00",
+      "categoria": "Mar",
+      "imagen": "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 6,
+      "nombre": "Seco de cordero",
+      "descripcion": "Cordero meloso en cilantro con frejoles y arroz blanco.",
+      "precio": "S/ 34.00",
+      "categoria": "Especiales",
+      "imagen": "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 7,
+      "nombre": "Chupe de camarones",
+      "descripcion": "Crema de camarones con queso fresco, huevo y arroz.",
+      "precio": "S/ 30.00",
+      "categoria": "Mar",
+      "imagen": "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      "id": 8,
+      "nombre": "Picarones",
+      "descripcion": "Masa de camote y zapallo con miel de chancaca caliente.",
+      "precio": "S/ 14.00",
+      "categoria": "Postres",
+      "imagen": "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=1200&q=80"
+    }
+  ],
+  "reservas": [
+    {
+      "id": 101,
+      "cliente": "Valeria Quispe",
+      "telefono": "987112233",
+      "fecha": "2026-05-12",
+      "hora": "19:00",
+      "personas": 2,
+      "mesa": "M2",
+      "zona": "Salón principal",
+      "estado": "Confirmada",
+      "notas": "Mesa junto a ventana"
+    },
+    {
+      "id": 102,
+      "cliente": "Diego Huamán",
+      "telefono": "956778899",
+      "fecha": "2026-05-12",
+      "hora": "20:00",
+      "personas": 4,
+      "mesa": "M4",
+      "zona": "Salón principal",
+      "estado": "Pendiente",
+      "notas": ""
+    },
+    {
+      "id": 103,
+      "cliente": "Lucía Fernández",
+      "telefono": "944556677",
+      "fecha": "2026-05-13",
+      "hora": "13:00",
+      "personas": 3,
+      "mesa": "M3",
+      "zona": "Salón principal",
+      "estado": "Confirmada",
+      "notas": "Un menor con silla alta"
+    },
+    {
+      "id": 104,
+      "cliente": "Martín Rojas",
+      "telefono": "933445566",
+      "fecha": "2026-05-13",
+      "hora": "18:00",
+      "personas": 2,
+      "mesa": "M1",
+      "zona": "Salón principal",
+      "estado": "Atendida",
+      "notas": ""
+    },
+    {
+      "id": 105,
+      "cliente": "Camila Torres",
+      "telefono": "922334455",
+      "fecha": "2026-05-13",
+      "hora": "19:00",
+      "personas": 6,
+      "mesa": "M6",
+      "zona": "Terraza",
+      "estado": "Pendiente",
+      "notas": "Cumpleaños — pastel externo"
+    },
+    {
+      "id": 106,
+      "cliente": "André Salazar",
+      "telefono": "911223344",
+      "fecha": "2026-05-13",
+      "hora": "21:00",
+      "personas": 2,
+      "mesa": "M2",
+      "zona": "Salón principal",
+      "estado": "No show",
+      "notas": "No se presentó — mesa liberada"
+    },
+    {
+      "id": 107,
+      "cliente": "Paola Méndez",
+      "telefono": "988776655",
+      "fecha": "2026-05-14",
+      "hora": "12:00",
+      "personas": 4,
+      "mesa": "M4",
+      "zona": "Salón principal",
+      "estado": "Confirmada",
+      "notas": "Alergia a maní"
+    },
+    {
+      "id": 108,
+      "cliente": "Ricardo Paredes",
+      "telefono": "977665544",
+      "fecha": "2026-05-14",
+      "hora": "14:00",
+      "personas": 2,
+      "mesa": "M2",
+      "zona": "Salón principal",
+      "estado": "Pendiente",
+      "notas": ""
+    },
+    {
+      "id": 109,
+      "cliente": "Sofía Núñez",
+      "telefono": "966554433",
+      "fecha": "2026-05-14",
+      "hora": "19:00",
+      "personas": 5,
+      "mesa": "M5",
+      "zona": "Terraza",
+      "estado": "Confirmada",
+      "notas": "Aniversario — flores en mesa"
+    },
+    {
+      "id": 110,
+      "cliente": "Javier Ortiz",
+      "telefono": "955443322",
+      "fecha": "2026-05-14",
+      "hora": "20:00",
+      "personas": 3,
+      "mesa": "M3",
+      "zona": "Salón principal",
+      "estado": "Pendiente",
+      "notas": ""
+    },
+    {
+      "id": 111,
+      "cliente": "Daniela Castro",
+      "telefono": "944332211",
+      "fecha": "2026-05-15",
+      "hora": "18:00",
+      "personas": 2,
+      "mesa": "M1",
+      "zona": "Salón principal",
+      "estado": "Confirmada",
+      "notas": ""
+    },
+    {
+      "id": 112,
+      "cliente": "Bruno Aguilar",
+      "telefono": "933221100",
+      "fecha": "2026-05-15",
+      "hora": "19:00",
+      "personas": 6,
+      "mesa": "M6",
+      "zona": "Terraza",
+      "estado": "Pendiente",
+      "notas": "Reunión de equipo (6 pax)"
+    },
+    {
+      "id": 113,
+      "cliente": "Mariana Vargas",
+      "telefono": "922110099",
+      "fecha": "2026-05-16",
+      "hora": "13:00",
+      "personas": 4,
+      "mesa": "M4",
+      "zona": "Salón principal",
+      "estado": "Confirmada",
+      "notas": ""
+    },
+    {
+      "id": 114,
+      "cliente": "Felipe Ramos",
+      "telefono": "911009988",
+      "fecha": "2026-05-17",
+      "hora": "20:00",
+      "personas": 2,
+      "mesa": "M2",
+      "zona": "Salón principal",
+      "estado": "Pendiente",
+      "notas": "Prefieren mesa tranquila"
+    },
+    {
+      "id": 115,
+      "cliente": "Gabriela León",
+      "telefono": "900998877",
+      "fecha": "2026-05-18",
+      "hora": "21:00",
+      "personas": 3,
+      "mesa": "M3",
+      "zona": "Salón principal",
+      "estado": "Confirmada",
+      "notas": ""
+    }
+  ],
+  "cuentas": [
+    {
+      "id": 1,
+      "nombre": "Valeria Quispe",
+      "correo": "valeria.quispe@mail.com",
+      "rol": "Cliente",
+      "estado": "Activo"
+    },
+    {
+      "id": 2,
+      "nombre": "Diego Huamán",
+      "correo": "diego.huaman@mail.com",
+      "rol": "Cliente",
+      "estado": "Activo"
+    },
+    {
+      "id": 3,
+      "nombre": "Carlos Ramos",
+      "correo": "c.ramos@sazonimperial.pe",
+      "rol": "Administrador",
+      "estado": "Activo"
+    },
+    {
+      "id": 4,
+      "nombre": "Ana Torres",
+      "correo": "ana.torres@mail.com",
+      "rol": "Cliente",
+      "estado": "Inactivo"
+    },
+    {
+      "id": 5,
+      "nombre": "Lucía Fernández",
+      "correo": "lucia.fernandez@mail.com",
+      "rol": "Cliente",
+      "estado": "Activo"
+    },
+    {
+      "id": 6,
+      "nombre": "Martín Rojas",
+      "correo": "martin.rojas@mail.com",
+      "rol": "Cliente",
+      "estado": "Activo"
+    },
+    {
+      "id": 7,
+      "nombre": "Mayra Cliente Demo",
+      "correo": "cliente@sazon.com",
+      "rol": "Cliente",
+      "estado": "Activo"
+    },
+    {
+      "id": 8,
+      "nombre": "Sofía Núñez",
+      "correo": "sofia.nunez@mail.com",
+      "rol": "Cliente",
+      "estado": "Activo"
+    }
+  ],
+  "local": {
+    "nombre": "TRES REGIONES",
+    "telefono": "987 654 321",
+    "direccion": "Av. Javier Prado Este 4200, San Borja — Lima",
+    "horario": "Lunes a domingo · 12:00 – 23:00",
+    "descripcion": "Cocina peruana contemporánea con carta rotativa, bar de piscos y reservas en línea.",
+    "cocina": "Peruana",
+    "estadoLocal": "Abierto",
+    "capacidadAprox": "68 comensales",
+    "zonas": [
+      "Salón principal",
+      "Terraza",
+      "Bar"
+    ]
+  }
+}
