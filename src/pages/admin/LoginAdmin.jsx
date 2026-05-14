@@ -36,8 +36,9 @@ export default function LoginAdmin() {
   };
 
   return (
-    <div className="split">
-      <div className="split__left">
+    <div className="standalone-page">
+      <div className="split">
+        <div className="split__left">
         <div className="split__badge">
           <span style={{ color: "var(--gold-600)", fontWeight: 900 }}>●</span>
           Acceso administrativo
@@ -48,8 +49,8 @@ export default function LoginAdmin() {
         </p>
 
         <div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Link to="/" className="btn btn--ghost">
-            Volver al inicio
+          <Link to="/login" className="btn btn--ghost">
+            Vista visitante (login)
           </Link>
           <a href="#login" className="btn btn--light">
             Iniciar sesión
@@ -105,13 +106,14 @@ export default function LoginAdmin() {
           </form>
 
           <p className="hint">
-            Demo cliente: <strong>cliente@sazon.com</strong> / <strong>123456</strong>
+            Demo visitante (web): <strong>Mayra Cliente Demo</strong> + celular <strong>999888777</strong>
           </p>
 
           <p className="hint">
-            ¿Problemas para ingresar? <Link to="/">Volver al inicio</Link>
+            ¿Problemas para ingresar? <Link to="/login">Ir al acceso visitante</Link>
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

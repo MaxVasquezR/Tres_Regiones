@@ -43,6 +43,12 @@ export default function AdminLayout() {
           >
             Perfil del local
           </NavLink>
+          <NavLink
+            to="/admin/pedidos"
+            className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`}
+          >
+            Pedidos web
+          </NavLink>
           {haySesionAdmin() && (
             <button
               type="button"
@@ -61,17 +67,19 @@ export default function AdminLayout() {
       </aside>
 
       <main className="admin__main">
-        {haySesionAdmin() && (
-          <header className="admin-topbar">
-            <span
-              className="admin-topbar__hello"
-              title={sesion?.usuario ? `Usuario: ${sesion.usuario}` : undefined}
-            >
-              Hola, {nombreParaMostrarAdmin(sesion)}
-            </span>
-          </header>
-        )}
-        <Outlet />
+        <div className="admin__inner">
+          {haySesionAdmin() && (
+            <header className="admin-topbar">
+              <span
+                className="admin-topbar__hello"
+                title={sesion?.usuario ? `Usuario: ${sesion.usuario}` : undefined}
+              >
+                Hola, {nombreParaMostrarAdmin(sesion)}
+              </span>
+            </header>
+          )}
+          <Outlet />
+        </div>
       </main>
     </div>
   );

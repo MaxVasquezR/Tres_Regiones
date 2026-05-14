@@ -11,6 +11,20 @@ export const MESAS = [
   { codigo: "M6", capacidad: 6, zona: "Terraza", etiqueta: "Atardecer", ambiente: "Grupo" },
 ];
 
+/** Posiciones % dentro del canvas del plano (0–100) por zona — vista previa comercial / confirmación. */
+export const PLANO_MESAS_POR_ZONA = {
+  "Salón principal": [
+    { codigo: "M1", x: 8, y: 10, w: 22, h: 24 },
+    { codigo: "M2", x: 70, y: 10, w: 22, h: 24 },
+    { codigo: "M3", x: 34, y: 38, w: 32, h: 28 },
+    { codigo: "M4", x: 14, y: 72, w: 72, h: 18 },
+  ],
+  Terraza: [
+    { codigo: "M5", x: 10, y: 28, w: 38, h: 44 },
+    { codigo: "M6", x: 54, y: 22, w: 36, h: 50 },
+  ],
+};
+
 export const TOTAL_MESAS = MESAS.length;
 
 export function mesasOcupadas(reservas, fecha, hora) {

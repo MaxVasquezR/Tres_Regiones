@@ -1,42 +1,42 @@
 const pilares = [
   {
-    title: "Servicio en sala",
-    copy: "La experiencia es presencial en Lima: reserva, llega al local y vive la carta de las tres regiones.",
+    title: "Sala y turismo",
+    copy: "El visitante vive un recorrido premium: conoce la oferta de tres regiones y separa mesa antes de llegar al local en Lima.",
   },
   {
-    title: "Mesa elegida",
-    copy: "El visitante selecciona turno, ambiente y mesa antes de confirmar su separación.",
+    title: "Mesa bajo control",
+    copy: "Turno, ambiente y mesa elegidos con claridad operativa: la misma lógica que escalará con más salas y horarios.",
   },
   {
-    title: "Operación visible",
-    copy: "El administrador lee ocupación, depósitos, canales y riesgo desde un panel con gráficos.",
+    title: "Operación con vista",
+    copy: "El equipo revisa ocupación, depósitos y estados en un panel serio, pensado para dueños e inversionistas en preventa.",
   },
 ];
 
 const regiones = [
   {
     title: "Costa",
-    copy: "Cítricos, mar y sazón limeña para viajeros que llegan del malecón o del aeropuerto.",
+    copy: "Mar, limón y calor limeño: piqueos y clásicos que reciben al viajero que aterriza en la capital.",
   },
   {
     title: "Sierra",
-    copy: "Papas andinas, ajíes y caldos profundos con memoria de altura.",
+    copy: "Papa nativa, ají panca y caldos profundos: memoria andina en cada bocado.",
   },
   {
     title: "Selva",
-    copy: "Frutas amazónicas y notas tropicales para cerrar un itinerario con identidad.",
+    copy: "Frutas amazónicas y notas audaces para cerrar un itinerario con sello peruano.",
   },
 ];
 
 export default function DemoAccessPanel() {
   return (
-    <section className="experience-guide" aria-label="Experiencia presencial">
+    <div className="experience-guide" role="region" aria-label="Propuesta de valor · minimuestra">
       <div className="experience-guide__intro">
-        <p className="eyebrow">Turismo presencial</p>
-        <h2 className="section-title">Una minimuestra pensada para recibir viajeros</h2>
+        <p className="eyebrow">Preventa comercial</p>
+        <h2 className="section-title">Plataforma lista para mostrar, no para improvisar</h2>
         <p className="section-lead">
-          Sin delivery ni reparto: aquí se prueba cómo un restaurante turístico vende mesa, personaliza la visita y opera
-          la sala con datos reales.
+          Esta interfaz ocupa la pantalla de forma deliberada: impacto visual para socios, flujo claro para el visitante
+          y panel administrativo alineado con la operación real. Los datos se ampliarán en la versión productiva.
         </p>
       </div>
 
@@ -57,6 +57,6 @@ export default function DemoAccessPanel() {
           </article>
         ))}
       </div>
-    </section>
+    </div>
   );
 }

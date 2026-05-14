@@ -247,6 +247,7 @@
       "notas": ""
     }
   ],
+  "pedidos": [],
   "cuentas": [
     {
       "id": 1,
@@ -294,6 +295,7 @@
       "id": 7,
       "nombre": "Mayra Cliente Demo",
       "correo": "cliente@sazon.com",
+      "telefono": "999888777",
       "rol": "Cliente",
       "estado": "Activo"
     },

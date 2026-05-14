@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { apiGet } from "../../api";
-import { SESSION_KEY, haySesionCliente, nombreParaMostrarCliente, obtenerSesion } from "../../session";
+import { useCart } from "../../context/CartContext";
+import { SESSION_KEY, nombreParaMostrarCliente, obtenerSesion } from "../../session";
 import DemoAccessPanel from "../../components/DemoAccessPanel";
 
 const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1529042410759-befb1204b952?auto=format&fit=crop&w=1800&q=80";
+  "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=2200&q=82";
 
 const platosLocal = [
   {
@@ -13,6 +14,7 @@ const platosLocal = [
     nombre: "Lomo saltado",
     descripcion: "Carne salteada con cebolla, tomate y papas doradas.",
     precio: "S/ 24.00",
+    categoria: "Costa",
     imagen: "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80",
   },
   {
@@ -20,6 +22,7 @@ const platosLocal = [
     nombre: "Ají de gallina",
     descripcion: "Pollo deshilachado en crema de ají amarillo.",
     precio: "S/ 20.00",
+    categoria: "Sierra",
     imagen: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
   },
   {
@@ -27,6 +30,7 @@ const platosLocal = [
     nombre: "Arroz con pollo",
     descripcion: "Arroz verde con pollo y salsa criolla.",
     precio: "S/ 18.00",
+    categoria: "Costa",
     imagen: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
   },
 ];
@@ -49,18 +53,18 @@ function SkeletonPlatos() {
 }
 
 export default function Home() {
+  const { addPlato, countPlatos } = useCart();
   const [platos, setPlatos] = useState(platosLocal);
   const [platosLoading, setPlatosLoading] = useState(true);
   const [, setPlatosFuente] = useState("local");
   const [, setSesionTick] = useState(0);
   const location = useLocation();
 
-  const logueado = haySesionCliente();
   const nombreCliente = nombreParaMostrarCliente(obtenerSesion());
   const highlights = [
-    { label: "Experiencia presencial", value: "100%" },
-    { label: "Ambientes en sala", value: "2" },
-    { label: "Turnos diarios", value: "7" },
+    { label: "Servicio en sala", value: "100%" },
+    { label: "Ambientes", value: "2" },
+    { label: "Turnos / noche", value: "7" },
   ];
 
   useEffect(() => {
@@ -103,87 +107,91 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="home">
-      <section className="hero hero--tourism" style={{ backgroundImage: `url(${HERO_IMAGE})` }}>
-        <div className="hero__overlay" />
-        <div className="hero__content">
-          <p className="eyebrow eyebrow--light">Restaurante turístico · Lima</p>
-          <h1 className="hero__title">
-            {logueado ? `Hola, ${nombreCliente}` : "TRES REGIONES"}
-          </h1>
-          <p className="hero__subtitle">
-            {logueado ? (
-              <>
-                Gracias por volver. Revisa la carta de costa, sierra y selva, y reserva tu mesa con la misma experiencia
-                que verán los viajeros en destino.
-              </>
-            ) : (
-              <>
-                Cocina peruana para viajeros: explora la carta, elige mesa y confirma tu visita presencial con una
-                experiencia premium de reserva.
-              </>
-            )}
-          </p>
-
-          <div className="hero__actions">
-            {logueado ? (
-              <Link to="/reservar" className="btn btn--light">
-                Reservar mesa
-              </Link>
-            ) : (
-              <>
-                <Link to="/login" className="btn btn--light" state={{ from: "/reservar" }}>
-                  Reservar experiencia
+    <div className="home home--flow">
+      <section className="immersive-hero full-bleed" aria-label="Bienvenida">
+        <div className="immersive-hero__bg hero hero--tourism" style={{ backgroundImage: `url(${HERO_IMAGE})` }}>
+          <div className="hero__overlay" aria-hidden />
+          <div className="immersive-hero__frame container container--wide">
+            <div className="hero__content">
+              <p className="eyebrow eyebrow--light">Sesión activa</p>
+              <h1 className="hero__title">Hola, {nombreCliente}</h1>
+              <p className="hero__subtitle">
+                Sigue con tu pedido o reserva en sala. El panel del local sigue disponible para la demo comercial.
+              </p>
+              <div className="hero__actions">
+                <Link to="/carrito" className="btn btn--light">
+                  Carrito{countPlatos ? ` (${countPlatos})` : ""}
                 </Link>
-                <Link to="/login" className="btn btn--ghost">
-                  Acceso visitante
+                <Link to="/reservar" className="btn btn--sun">
+                  Ir a pedido / reserva
                 </Link>
-              </>
-            )}
-            <Link to="/admin/login" className="btn btn--ghost">
-              Panel del local
-            </Link>
-          </div>
-
-          <div className="hero__stats" aria-label="Indicadores del restaurante">
-            {highlights.map((h) => (
-              <article key={h.label} className="hero__stat">
-                <span className="hero__stat-value">{h.value}</span>
-                <span className="hero__stat-label">{h.label}</span>
-              </article>
-            ))}
+                <a href="#carta" className="btn btn--outline-hero">
+                  Ver carta
+                </a>
+                <Link to="/admin/login" className="btn btn--ghost">
+                  Panel del local
+                </Link>
+              </div>
+              <div className="hero__stats" aria-label="Indicadores de la minimuestra">
+                {highlights.map((h) => (
+                  <article key={h.label} className="hero__stat">
+                    <span className="hero__stat-value">{h.value}</span>
+                    <span className="hero__stat-label">{h.label}</span>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <DemoAccessPanel />
-
-      <section className="menu-section">
-        <div className="section-heading">
-          <p className="eyebrow">Carta de viaje</p>
-          <h2 className="section-title">{logueado ? `${nombreCliente}, platos sugeridos` : "Sabores que cuentan el Perú"}</h2>
-          <p className="section-lead">
-            Platos emblemáticos de costa, sierra y selva para inspirar la visita antes de reservar mesa en sala.
-          </p>
+      <section className="surface-band surface-band--paper">
+        <div className="container container--wide">
+          <DemoAccessPanel />
         </div>
+      </section>
 
-        {platosLoading ? (
-          <SkeletonPlatos />
-        ) : (
-          <div className="menu-grid">
-            {platos.map((plato) => (
-              <article key={plato.id} className="menu-card lift">
-                <img src={plato.imagen} alt={plato.nombre} className="menu-card__image" loading="lazy" />
-                <div className="menu-card__body">
-                  <h3>{plato.nombre}</h3>
-                  {plato.categoria && <p className="menu-card__category">{plato.categoria}</p>}
-                  <p className="menu-card__description">{plato.descripcion}</p>
-                  <strong className="menu-card__price">{plato.precio}</strong>
-                </div>
-              </article>
-            ))}
+      <section className="surface-band surface-band--mist" id="carta">
+        <div className="container container--wide">
+          <div className="menu-section" aria-labelledby="menu-heading">
+            <div className="section-heading">
+              <p className="eyebrow">Carta · tres regiones</p>
+              <h2 id="menu-heading" className="section-title">
+                {nombreCliente}, catálogo de la minimuestra
+              </h2>
+              <p className="section-lead">
+                Aquí se amplía la oferta: más platos, upsells y pagos en la versión comercial. Arriba ya viste el
+                gancho; abajo está la prueba de profundidad para socios e inversores.
+              </p>
+            </div>
+
+            {platosLoading ? (
+              <SkeletonPlatos />
+            ) : (
+              <div className="menu-grid">
+                {platos.map((plato) => (
+                  <article key={plato.id} className="menu-card card lift">
+                    <img src={plato.imagen} alt={plato.nombre} className="menu-card__image" loading="lazy" />
+                    <div className="menu-card__body">
+                      <h3>{plato.nombre}</h3>
+                      {plato.categoria && <p className="menu-card__category">{plato.categoria}</p>}
+                      <p className="menu-card__description">{plato.descripcion}</p>
+                      <strong className="menu-card__price">{plato.precio}</strong>
+                      <div className="menu-card__actions">
+                        <button type="button" className="btn btn--primary menu-card__btn" onClick={() => addPlato(plato)}>
+                          Añadir
+                        </button>
+                        <Link to="/carrito" className="btn btn--outline-dark menu-card__btn">
+                          Carrito
+                        </Link>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </section>
     </div>
   );

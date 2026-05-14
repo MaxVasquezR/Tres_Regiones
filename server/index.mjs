@@ -111,14 +111,26 @@ function writeStore(store) {
   return writeChain;
 }
 
-function migrateCuentasDemo(store) {
+function migrateCuentasClienteTelefono(store) {
   let dirty = false;
   for (const c of store.cuentas) {
-    if (c.passwordHash) continue;
-    if (String(c.correo).toLowerCase() !== "cliente@sazon.com") continue;
     if (String(c.rol) !== "Cliente") continue;
-    c.passwordHash = hashPasswordDeterministic("123456", `cliente:${String(c.correo).toLowerCase()}`);
-    dirty = true;
+    const demo = String(c.correo).toLowerCase() === "cliente@sazon.com";
+    let tel = String(c.telefono ?? "").replace(/\D/g, "").slice(0, 9);
+    if (demo && tel.length !== 9) {
+      c.telefono = "999888777";
+      tel = "999888777";
+      dirty = true;
+    }
+    if (tel.length === 9 && !c.passwordHash) {
+      c.passwordHash = hashPasswordDeterministic(tel, `cliente:tel:${tel}`);
+      dirty = true;
+    }
+    if (demo && c.passwordHash && verifyPassword("123456", c.passwordHash)) {
+      const t = String(c.telefono ?? "999888777").replace(/\D/g, "").slice(0, 9);
+      c.passwordHash = hashPasswordDeterministic(t, `cliente:tel:${t}`);
+      dirty = true;
+    }
   }
   return dirty;
 }
@@ -196,6 +208,16 @@ function normalizarTexto(v) {
   return String(v ?? "").trim();
 }
 
+/** Igualdad de nombre para login (sin acentos, colapsa espacios, minúsculas). */
+function normalizeNombreClave(s) {
+  return String(s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
 function validarCorreo(correo) {
   const email = normalizarTexto(correo).toLowerCase();
   const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -270,6 +292,26 @@ function requireAdmin(req, res) {
   return p;
 }
 
+function requireClient(req, res) {
+  const p = authPayload(req);
+  if (!p || p.role !== "client") {
+    json(res, 401, { error: "Se requiere sesión de cliente." });
+    return null;
+  }
+  return p;
+}
+
+function ensurePedidosArray(store) {
+  if (!Array.isArray(store.pedidos)) store.pedidos = [];
+}
+
+function parsePrecioSoles(str) {
+  const m = String(str ?? "")
+    .replace(/,/g, ".")
+    .match(/(\d+(?:\.\d{1,2})?)/);
+  return m ? Number(m[1]) : 0;
+}
+
 function cuentaSinSecret(c) {
   const { passwordHash: _omit, ...rest } = c;
   return rest;
@@ -284,6 +326,61 @@ function reservasResumen(store) {
     estado: r.estado,
     zona: r.zona,
   }));
+}
+
+const geoThrottleByIp = new Map();
+
+function geoThrottle(ip, kind) {
+  const key = `${ip}:${kind}`;
+  const now = Date.now();
+  const last = geoThrottleByIp.get(key) || 0;
+  if (now - last < 900) return true;
+  geoThrottleByIp.set(key, now);
+  return false;
+}
+
+function direccionDesdeNominatimPlace(data) {
+  const a = data?.address || {};
+  const road = a.road || a.pedestrian || a.residential || a.path || "";
+  const num = a.house_number || "";
+  let calle = [road, num].filter(Boolean).join(" ").trim();
+  if (!calle && data?.display_name) {
+    calle = String(data.display_name).split(",").slice(0, 2).join(", ").trim();
+  }
+  const distrito =
+    a.city_district ||
+    a.suburb ||
+    a.neighbourhood ||
+    a.quarter ||
+    a.city ||
+    a.town ||
+    a.village ||
+    a.municipality ||
+    a.state ||
+    "";
+  const lat = Number(data?.lat);
+  const lng = Number(data?.lon);
+  return {
+    calle: calle.slice(0, 160),
+    distrito: String(distrito).slice(0, 80),
+    etiqueta: String(data?.display_name || "").slice(0, 220),
+    lat: Number.isFinite(lat) ? lat : null,
+    lng: Number.isFinite(lng) ? lng : null,
+  };
+}
+
+async function nominatimFetchJson(urlStr) {
+  const res = await fetch(urlStr, {
+    headers: {
+      "User-Agent": "TresRegionesMinimuestra/1.0 (demo preventa)",
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Geocoding HTTP ${res.status}: ${text.slice(0, 120)}`);
+  }
+  return res.json();
 }
 
 const server = http.createServer(async (req, res) => {
@@ -319,6 +416,239 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/api/mis-pedidos") {
+      const p = requireClient(req, res);
+      if (!p) return;
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const mine = store.pedidos.filter((x) => Number(x.clienteId) === Number(p.sub));
+      json(res, 200, { data: mine });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/geo/reverse") {
+      const p = requireClient(req, res);
+      if (!p) return;
+      const ip = requestIp(req);
+      if (geoThrottle(ip, "reverse")) {
+        json(res, 429, { error: "Espera un momento entre lecturas de mapa." });
+        return;
+      }
+      const { searchParams } = parsePath(req.url || "/");
+      const lat = Number(searchParams.get("lat"));
+      const lng = Number(searchParams.get("lng"));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+        json(res, 422, { error: "Coordenadas inválidas." });
+        return;
+      }
+      try {
+        const u = new URL("https://nominatim.openstreetmap.org/reverse");
+        u.searchParams.set("format", "jsonv2");
+        u.searchParams.set("lat", String(lat));
+        u.searchParams.set("lon", String(lng));
+        u.searchParams.set("accept-language", "es");
+        const raw = await nominatimFetchJson(u.toString());
+        json(res, 200, { data: direccionDesdeNominatimPlace(raw) });
+      } catch (e) {
+        json(res, 502, { error: e?.message || "No se pudo interpretar la ubicación." });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/geo/search") {
+      const p = requireClient(req, res);
+      if (!p) return;
+      const ip = requestIp(req);
+      if (geoThrottle(ip, "search")) {
+        json(res, 429, { error: "Espera un momento entre búsquedas de texto." });
+        return;
+      }
+      const { searchParams } = parsePath(req.url || "/");
+      const q = normalizarTexto(searchParams.get("q") || "");
+      if (q.length < 4) {
+        json(res, 422, { error: "Escribe al menos 4 caracteres para buscar." });
+        return;
+      }
+      try {
+        const u = new URL("https://nominatim.openstreetmap.org/search");
+        u.searchParams.set("format", "jsonv2");
+        u.searchParams.set("q", `${q}, Lima, Peru`);
+        u.searchParams.set("limit", "6");
+        u.searchParams.set("accept-language", "es");
+        const arr = await nominatimFetchJson(u.toString());
+        const list = Array.isArray(arr) ? arr : [];
+        const results = list.map((raw) => {
+          const m = direccionDesdeNominatimPlace(raw);
+          return {
+            lat: m.lat,
+            lng: m.lng,
+            label: m.etiqueta,
+            calle: m.calle,
+            distrito: m.distrito,
+          };
+        });
+        json(res, 200, { data: { results } });
+      } catch (e) {
+        json(res, 502, { error: e?.message || "Búsqueda no disponible." });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/pedidos") {
+      if (!requireAdmin(req, res)) return;
+      const store = await readStore();
+      ensurePedidosArray(store);
+      json(res, 200, { data: store.pedidos });
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/pedidos") {
+      const p = requireClient(req, res);
+      if (!p) return;
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__") {
+        json(res, 413, { error: "El payload excede el tamaño máximo permitido." });
+        return;
+      }
+      if (!body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const itemsIn = Array.isArray(body.items) ? body.items : [];
+      if (!itemsIn.length) {
+        json(res, 422, { error: "Agrega al menos un plato al pedido." });
+        return;
+      }
+      const delivery = Boolean(body.delivery);
+      const direccionRaw = body.direccion && typeof body.direccion === "object" ? body.direccion : {};
+      if (delivery) {
+        const calle = normalizarTexto(direccionRaw.calle ?? "");
+        const distrito = normalizarTexto(direccionRaw.distrito ?? "");
+        if (calle.length < 6 || distrito.length < 3) {
+          json(res, 422, {
+            error: "Para delivery indica calle y número (mín. 6 caracteres) y distrito válidos.",
+          });
+          return;
+        }
+      }
+      const paymentMethod = String(body.paymentMethod ?? "");
+      if (!["card", "qr", "cash"].includes(paymentMethod)) {
+        json(res, 422, { error: "Método de pago no válido (card, qr o cash)." });
+        return;
+      }
+      const contactoNombre = normalizarTexto(body.contactoNombre ?? "");
+      const contactoTelefono = String(body.contactoTelefono ?? "").replace(/\D/g, "").slice(0, 9);
+      if (contactoNombre.length < 3 || !/^[0-9]{9}$/.test(contactoTelefono)) {
+        json(res, 422, {
+          error: "Indica nombre de contacto (mín. 3 caracteres) y celular peruano de 9 dígitos para coordinar el pedido.",
+        });
+        return;
+      }
+      let comprobante = null;
+      const compIn = body.comprobante;
+      if (compIn && typeof compIn === "object" && Boolean(compIn.solicita)) {
+        const tipo = String(compIn.tipo ?? "").toLowerCase() === "factura" ? "factura" : "boleta";
+        const num = String(compIn.numeroDocumento ?? "").replace(/\D/g, "");
+        const razon = normalizarTexto(compIn.razonSocial ?? "");
+        if (tipo === "factura") {
+          if (num.length !== 11 || razon.length < 4) {
+            json(res, 422, {
+              error: "Factura (SUNAT): RUC de 11 dígitos y razón social o denominación del receptor son obligatorios.",
+            });
+            return;
+          }
+          comprobante = {
+            tipoSunat: "01",
+            tipo: "factura",
+            numeroDocumento: num,
+            razonSocial: razon.slice(0, 200),
+          };
+        } else {
+          if (num.length !== 8 || razon.length < 4) {
+            json(res, 422, {
+              error: "Boleta (SUNAT): DNI de 8 dígitos y nombre completo del titular son obligatorios.",
+            });
+            return;
+          }
+          comprobante = {
+            tipoSunat: "03",
+            tipo: "boleta",
+            numeroDocumento: num,
+            razonSocial: razon.slice(0, 200),
+          };
+        }
+      }
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const itemsClean = [];
+      let subtotal = 0;
+      for (const row of itemsIn) {
+        const plato = store.platos.find((x) => Number(x.id) === Number(row.platoId));
+        if (!plato) {
+          json(res, 422, { error: `Plato no encontrado: ${row.platoId}` });
+          return;
+        }
+        const unit = parsePrecioSoles(plato.precio);
+        if (unit <= 0 || unit > 500) {
+          json(res, 422, { error: "Precio de plato inválido en catálogo." });
+          return;
+        }
+        const qty = Math.min(20, Math.max(1, Math.floor(Number(row.qty)) || 1));
+        itemsClean.push({
+          platoId: plato.id,
+          nombre: plato.nombre,
+          precioSoles: unit,
+          qty,
+        });
+        subtotal += unit * qty;
+      }
+      const deliverySoles = delivery ? 10 : 0;
+      const total = Math.round((subtotal + deliverySoles) * 100) / 100;
+      const codigoPago = `TR-${Date.now().toString(36).toUpperCase().slice(-5)}${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+      const qrPayload = `PE|TRES_REGIONES|${codigoPago}|${total.toFixed(2)}|PEN|YAPE_PLIN`;
+      let estado = "Pendiente_caja";
+      if (paymentMethod === "card") estado = "Pagado_simulado_tarjeta";
+      if (paymentMethod === "qr") estado = "Pendiente_confirmacion_QR";
+      const pedido = {
+        id: nextId(store.pedidos),
+        clienteId: Number(p.sub),
+        clienteNombre: String(p.nombre ?? ""),
+        clienteCorreo: String(p.email ?? ""),
+        clienteTelefonoCuenta: String(p.telefono ?? "").replace(/\D/g, "") || null,
+        contactoNombre: contactoNombre.slice(0, 120),
+        contactoTelefono,
+        comprobante,
+        items: itemsClean,
+        delivery,
+        direccion: delivery
+          ? {
+              calle: normalizarTexto(direccionRaw.calle ?? "").slice(0, 160),
+              distrito: normalizarTexto(direccionRaw.distrito ?? "").slice(0, 80),
+              urbanizacion: normalizarTexto(direccionRaw.urbanizacion ?? "").slice(0, 80),
+              referencia: normalizarTexto(direccionRaw.referencia ?? "").slice(0, 200),
+              lat: Number.isFinite(Number(direccionRaw.lat)) ? Number(direccionRaw.lat) : null,
+              lng: Number.isFinite(Number(direccionRaw.lng)) ? Number(direccionRaw.lng) : null,
+              fuente: ["gps", "mapa", "manual"].includes(String(direccionRaw.fuente || "").toLowerCase())
+                ? String(direccionRaw.fuente).toLowerCase()
+                : null,
+            }
+          : null,
+        paymentMethod,
+        cardLast4: paymentMethod === "card" ? String(body.cardLast4 ?? "").replace(/\D/g, "").slice(-4) || null : null,
+        subtotalSoles: subtotal,
+        deliverySoles,
+        totalSoles: total,
+        codigoPago,
+        qrPayload,
+        estado,
+        creadoEn: new Date().toISOString(),
+      };
+      store.pedidos.push(pedido);
+      await writeStore(store);
+      json(res, 201, { data: pedido });
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/api/reservas-publicas") {
       const store = await readStore();
       json(res, 200, { data: reservasResumen(store) });
@@ -349,6 +679,8 @@ const server = http.createServer(async (req, res) => {
       const rol = normalizarTexto(body.rol);
       const estado = normalizarTexto(body.estado) || "Activo";
       const contrasena = String(body.contrasena ?? "");
+      const telefonoDigits = String(body.telefono ?? "").replace(/\D/g, "").slice(0, 9);
+      const telOk = /^[0-9]{9}$/.test(telefonoDigits);
       if (!nombre || !correo) {
         json(res, 422, { error: "Nombre y correo son obligatorios." });
         return;
@@ -370,12 +702,23 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (rol === "Cliente" && contrasena.length > 0 && contrasena.length < 6) {
-        json(res, 422, { error: "La contraseña debe tener al menos 6 caracteres." });
+        json(res, 422, { error: "La contraseña debe tener al menos 6 caracteres, o déjala vacía y usa el celular (9 dígitos)." });
+        return;
+      }
+      if (rol === "Cliente" && contrasena.length === 0 && !telOk) {
+        json(res, 422, {
+          error:
+            "Para cliente indica un celular peruano de 9 dígitos (será su clave en la web) o una contraseña de al menos 6 caracteres.",
+        });
         return;
       }
       const store = await readStore();
       if (store.cuentas.some((c) => String(c.correo).toLowerCase() === correo)) {
         json(res, 409, { error: "Ya existe una cuenta con ese correo." });
+        return;
+      }
+      if (telOk && store.cuentas.some((c) => String(c.telefono ?? "").replace(/\D/g, "") === telefonoDigits)) {
+        json(res, 409, { error: "Ya existe una cuenta con ese número de celular." });
         return;
       }
       const nueva = {
@@ -385,8 +728,13 @@ const server = http.createServer(async (req, res) => {
         rol,
         estado,
       };
+      if (telOk) {
+        nueva.telefono = telefonoDigits;
+      }
       if (contrasena.length >= 6) {
         nueva.passwordHash = hashPassword(contrasena);
+      } else if (rol === "Cliente" && telOk) {
+        nueva.passwordHash = hashPassword(telefonoDigits);
       }
       store.cuentas.push(nueva);
       await writeStore(store);
@@ -451,6 +799,21 @@ const server = http.createServer(async (req, res) => {
         }
         next.estado = e;
       }
+      if (body.telefono !== undefined && String(next.rol) === "Cliente") {
+        const t = String(body.telefono ?? "").replace(/\D/g, "").slice(0, 9);
+        if (t.length !== 9) {
+          json(res, 422, { error: "El celular del cliente debe tener exactamente 9 dígitos (omite el campo si no lo cambias)." });
+          return;
+        }
+        if (store.cuentas.some((c, i) => i !== idx && String(c.telefono ?? "").replace(/\D/g, "") === t)) {
+          json(res, 409, { error: "Ya existe otra cuenta con ese número de celular." });
+          return;
+        }
+        next.telefono = t;
+        if (!(body.contrasena !== undefined && String(body.contrasena).length > 0)) {
+          next.passwordHash = hashPassword(t);
+        }
+      }
       if (body.contrasena !== undefined && String(body.contrasena).length > 0) {
         const pw = String(body.contrasena);
         if (pw.length < 6) {
@@ -509,27 +872,39 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const nombre = normalizarTexto(body.nombre);
-      const correoVal = validarCorreo(body.correo);
-      const correo = correoVal.value;
-      const contrasena = String(body.contrasena ?? "");
-      if (!nombre || !correo) {
-        json(res, 422, { error: "Nombre y correo son obligatorios." });
+      const telefonoDigits = String(body.telefono ?? "").replace(/\D/g, "").slice(0, 9);
+      const telOk = /^[0-9]{9}$/.test(telefonoDigits);
+      const correoRaw = normalizarTexto(body.correo);
+      let correo = "";
+      if (correoRaw) {
+        const correoVal = validarCorreo(correoRaw);
+        if (!correoVal.ok) {
+          json(res, 422, { error: "El correo no tiene un formato válido." });
+          return;
+        }
+        correo = correoVal.value;
+      }
+      const aceptaMarketingWhatsapp = Boolean(body.aceptaMarketingWhatsapp);
+      if (!nombre || !telOk) {
+        json(res, 422, { error: "Nombre completo y celular peruano (9 dígitos) son obligatorios." });
         return;
       }
       if (nombre.length < 3 || nombre.length > 80) {
         json(res, 422, { error: "El nombre debe tener entre 3 y 80 caracteres." });
         return;
       }
-      if (!correoVal.ok) {
-        json(res, 422, { error: "El correo no tiene un formato válido." });
-        return;
-      }
-      if (contrasena.length < 6) {
-        json(res, 422, { error: "La contraseña debe tener al menos 6 caracteres." });
+      if (aceptaMarketingWhatsapp && !telOk) {
+        json(res, 422, {
+          error: "Si aceptas promociones por WhatsApp, indica un celular peruano de 9 dígitos.",
+        });
         return;
       }
       const store = await readStore();
-      if (store.cuentas.some((c) => String(c.correo).toLowerCase() === correo)) {
+      if (store.cuentas.some((c) => String(c.telefono ?? "").replace(/\D/g, "") === telefonoDigits)) {
+        json(res, 409, { error: "Ya existe una cuenta con ese número de celular." });
+        return;
+      }
+      if (correo && store.cuentas.some((c) => String(c.correo || "").toLowerCase() === correo)) {
         json(res, 409, { error: "Ya existe una cuenta con ese correo." });
         return;
       }
@@ -539,7 +914,9 @@ const server = http.createServer(async (req, res) => {
         correo,
         rol: "Cliente",
         estado: "Activo",
-        passwordHash: hashPassword(contrasena),
+        telefono: telefonoDigits,
+        passwordHash: hashPassword(telefonoDigits),
+        ...(aceptaMarketingWhatsapp ? { aceptaMarketingWhatsapp: true } : {}),
       };
       store.cuentas.push(nueva);
       await writeStore(store);
@@ -557,31 +934,45 @@ const server = http.createServer(async (req, res) => {
         json(res, 400, { error: "JSON inválido" });
         return;
       }
-      const correoVal = validarCorreo(body.correo);
-      const correo = correoVal.value;
-      const contrasena = String(body.contrasena ?? "");
-      if (!correoVal.ok || !contrasena) {
-        json(res, 422, { error: "Correo y contraseña son obligatorios." });
+      const nombreIn = normalizarTexto(body.nombre);
+      const contrasenaDigits = String(body.contrasena ?? "").replace(/\D/g, "").slice(0, 9);
+      if (!nombreIn || !/^[0-9]{9}$/.test(contrasenaDigits)) {
+        json(res, 422, { error: "Nombre como lo registraste y celular de 9 dígitos (tu contraseña) son obligatorios." });
         return;
       }
       const store = await readStore();
-      const cuenta = store.cuentas.find((c) => String(c.correo).toLowerCase() === correo);
-      if (!cuenta || cuenta.rol !== "Cliente" || cuenta.estado !== "Activo") {
-        json(res, 401, { error: "Credenciales incorrectas." });
-        return;
-      }
-      if (!cuenta.passwordHash || !verifyPassword(contrasena, cuenta.passwordHash)) {
+      const candidatos = store.cuentas.filter(
+        (c) =>
+          String(c.rol) === "Cliente" &&
+          String(c.estado) === "Activo" &&
+          String(c.telefono ?? "").replace(/\D/g, "") === contrasenaDigits,
+      );
+      const cuenta = candidatos.find((c) => normalizeNombreClave(c.nombre) === normalizeNombreClave(nombreIn));
+      if (!cuenta || !cuenta.passwordHash || !verifyPassword(contrasenaDigits, cuenta.passwordHash)) {
         json(res, 401, { error: "Credenciales incorrectas." });
         return;
       }
       const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_SEC;
       const token = signAccessToken(
-        { sub: cuenta.id, role: "client", email: cuenta.correo, nombre: cuenta.nombre, exp },
+        {
+          sub: cuenta.id,
+          role: "client",
+          email: cuenta.correo || "",
+          nombre: cuenta.nombre,
+          telefono: String(cuenta.telefono ?? "").replace(/\D/g, ""),
+          exp,
+        },
         JWT_SECRET,
       );
       json(res, 200, {
         token,
-        user: { id: cuenta.id, nombre: cuenta.nombre, correo: cuenta.correo, rol: cuenta.rol },
+        user: {
+          id: cuenta.id,
+          nombre: cuenta.nombre,
+          correo: cuenta.correo || "",
+          telefono: String(cuenta.telefono ?? "").replace(/\D/g, ""),
+          rol: cuenta.rol,
+        },
       });
       return;
     }
@@ -856,7 +1247,7 @@ const server = http.createServer(async (req, res) => {
 await ensureDataFile();
 {
   const store = await readStore();
-  let dirty = migrateCuentasDemo(store);
+  let dirty = migrateCuentasClienteTelefono(store);
   if (migrateReservasCampos(store)) dirty = true;
   if (dirty) {
     await writeStore(store);

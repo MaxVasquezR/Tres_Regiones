@@ -17,7 +17,7 @@ export default function Dashboard() {
     <div className="admin-dashboard">
       <header className="admin-dashboard__head">
         <div>
-          <p className="eyebrow">Operación presencial</p>
+          <p className="eyebrow">Minimuestra · panel operativo</p>
           <h1>Centro de control turístico</h1>
           <p>Visión real de ocupación, depósitos, canales y riesgo operativo para el servicio en sala.</p>
         </div>

@@ -31,12 +31,18 @@ function nombreFallbackDesdeCorreo(correo) {
 
 export function iniciarSesionCliente({ token, user }) {
   const email = String(user?.correo || "").trim().toLowerCase();
-  const nombre = primerNombre(user?.nombre || "") || nombreFallbackDesdeCorreo(email);
+  const fullName = String(user?.nombre || "").trim();
+  const telefono = String(user?.telefono || "")
+    .replace(/\D/g, "")
+    .slice(0, 9);
+  const nombre = primerNombre(fullName) || nombreFallbackDesdeCorreo(email) || (telefono ? `Cliente ${telefono.slice(-4)}` : "Cliente");
   saveSession({
     role: "client",
     token,
     correo: email,
+    telefono,
     nombre,
+    nombreCompleto: fullName || email,
     at: new Date().toISOString(),
   });
 }

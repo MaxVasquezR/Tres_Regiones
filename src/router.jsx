@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import ClientLayout from "./layouts/ClientLayout";
 import AdminLayout from "./layouts/AdminLayout";
 
@@ -7,6 +7,8 @@ import Login from "./pages/client/Login";
 import Register from "./pages/client/Register";
 import Confirmacion from "./pages/client/Confirmacion";
 import ReservarMesa from "./pages/client/ReservarMesa";
+import Carrito from "./pages/client/Carrito";
+import Checkout from "./pages/client/Checkout";
 
 import LoginAdmin from "./pages/admin/LoginAdmin";
 import Dashboard from "./pages/admin/Dashboard";
@@ -14,16 +16,41 @@ import Cuentas from "./pages/admin/Cuentas";
 import Reservas from "./pages/admin/Reservas";
 import Calendario from "./pages/admin/Calendario";
 import PerfilLocal from "./pages/admin/PerfilLocal";
+import Pedidos from "./pages/admin/Pedidos";
 import { RequireAdminAuth, RequireClientAuth } from "./components/RouteGuards";
+import CatchAllRedirect from "./components/CatchAllRedirect";
 
 export default function AppRouter() {
   return (
     <Routes>
       <Route element={<ClientLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={(
+            <RequireClientAuth>
+              <Home />
+            </RequireClientAuth>
+          )}
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/confirmacion" element={<Confirmacion />} />
+        <Route
+          path="/carrito"
+          element={(
+            <RequireClientAuth>
+              <Carrito />
+            </RequireClientAuth>
+          )}
+        />
+        <Route
+          path="/checkout"
+          element={(
+            <RequireClientAuth>
+              <Checkout />
+            </RequireClientAuth>
+          )}
+        />
         <Route
           path="/reservar"
           element={(
@@ -77,9 +104,17 @@ export default function AppRouter() {
             </RequireAdminAuth>
           )}
         />
+        <Route
+          path="/admin/pedidos"
+          element={(
+            <RequireAdminAuth>
+              <Pedidos />
+            </RequireAdminAuth>
+          )}
+        />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<CatchAllRedirect />} />
     </Routes>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import SalonMap from "../../components/SalonMap";
+import SalonFloorPlan from "../../components/SalonFloorPlan";
 import StepFlow from "../../components/StepFlow";
 import { mesasDisponibles, mesasOcupadas, TURNOS, ZONAS } from "../../data/salon";
 import { useReservations } from "../../context/ReservationsContext";
@@ -36,7 +37,7 @@ export default function ReservarMesa() {
 
   const disponibles = useMemo(
     () => mesasDisponibles(reservas, form),
-    [reservas, form.fecha, form.hora, form.personas, form.zona],
+    [reservas, form],
   );
   const ocupadas = useMemo(() => mesasOcupadas(reservas, form.fecha, form.hora), [reservas, form.fecha, form.hora]);
 
@@ -131,24 +132,26 @@ export default function ReservarMesa() {
   };
 
   return (
-    <div className="booking">
-      <div className="booking__intro">
-        <p className="eyebrow">Reserva presencial</p>
-        <h1 className="section-title">Tu mesa en TRES REGIONES</h1>
-        <p className="section-lead">
-          Servicio en salón para viajeros y locales. Sin delivery: eliges turno, mesa y detalles premium antes de llegar al
-          restaurante.
-        </p>
-      </div>
+    <div className="booking-page">
+      <div className="container container--wide">
+        <div className="booking">
+          <div className="booking-page__head booking__intro">
+          <p className="eyebrow">Reserva en sala · minimuestra</p>
+          <h1 className="section-title">Tu mesa en TRES REGIONES</h1>
+          <p className="section-lead">
+            Flujo profesional para turismo presencial en Lima: turno, mapa de sala y confirmación con política clara.
+            Datos ampliados e integraciones en la versión comercial.
+          </p>
+        </div>
 
-      <StepFlow steps={STEPS} current={step} />
+        <StepFlow steps={STEPS} current={step} />
 
-      {!ready && (
-        <p className="loading-inline booking__loading">Sincronizando disponibilidad de mesas…</p>
-      )}
+        {!ready && (
+          <p className="loading-inline booking__loading">Sincronizando disponibilidad de mesas…</p>
+        )}
 
-      <form className="booking__panel card card--pad" onSubmit={handleSubmit}>
-        {step === 0 && (
+        <form className="booking__panel card card--pad" onSubmit={handleSubmit}>
+          {step === 0 && (
           <section className="booking__section">
             <h2>1. Define tu visita</h2>
             <p>Indica cuándo llegas, cuántos comensales son y en qué ambiente prefieres sentarte.</p>
@@ -249,6 +252,18 @@ export default function ReservarMesa() {
               {form.ocasion && <p>Ocasión: {form.ocasion}</p>}
               {form.referenciaHotel && <p>Referencia: {form.referenciaHotel}</p>}
             </div>
+            {form.mesa ? (
+              <div className="booking__floor-wow card card--pad">
+                <SalonFloorPlan
+                  key={`${form.mesa}-${form.zona}`}
+                  mesaDestacada={form.mesa}
+                  zonaDefault={form.zona}
+                  titulo="Así queda tu mesa en el plano"
+                  subtitulo="Mismo esquema que recibirás en la confirmación. Ideal para enseñar en demo a socios e inversionistas."
+                  variant="inline"
+                />
+              </div>
+            ) : null}
             <div className="policy-card">
               <strong>Política presencial</strong>
               <ul>
@@ -268,7 +283,7 @@ export default function ReservarMesa() {
 
         <div className="booking__actions">
           {step > 0 && (
-            <button type="button" className="btn" onClick={retroceder} disabled={submitting}>
+            <button type="button" className="btn btn--surface" onClick={retroceder} disabled={submitting}>
               Atrás
             </button>
           )}
@@ -277,6 +292,8 @@ export default function ReservarMesa() {
           </button>
         </div>
       </form>
+        </div>
+      </div>
     </div>
   );
 }

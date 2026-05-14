@@ -9,7 +9,7 @@ const cuentasLocal = [
   { id: 5, nombre: "Mayra Cliente", correo: "cliente@sazon.com", rol: "Cliente", estado: "Activo" },
 ];
 
-const emptyNueva = { nombre: "", correo: "", rol: "Cliente", estado: "Activo", contrasena: "" };
+const emptyNueva = { nombre: "", correo: "", telefono: "", rol: "Cliente", estado: "Activo", contrasena: "" };
 
 export default function Cuentas() {
   const [cuentas, setCuentas] = useState(cuentasLocal);
@@ -18,7 +18,14 @@ export default function Cuentas() {
   const [nueva, setNueva] = useState(emptyNueva);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [editForm, setEditForm] = useState({ nombre: "", correo: "", rol: "Cliente", estado: "Activo", contrasena: "" });
+  const [editForm, setEditForm] = useState({
+    nombre: "",
+    correo: "",
+    telefono: "",
+    rol: "Cliente",
+    estado: "Activo",
+    contrasena: "",
+  });
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -46,13 +53,28 @@ export default function Cuentas() {
     e.preventDefault();
     setSaving(true);
     setMsg("");
+    const tel = nueva.telefono.replace(/\D/g, "").slice(0, 9);
+    const pw = nueva.contrasena.trim();
+    if (nueva.rol === "Cliente") {
+      if (pw.length > 0 && pw.length < 6) {
+        setMsg("Si asignas contraseña manual, debe tener al menos 6 caracteres. Si no, deja el campo vacío y usa solo el celular (9 dígitos).");
+        setSaving(false);
+        return;
+      }
+      if (pw.length === 0 && tel.length !== 9) {
+        setMsg("Cliente web: indica un celular peruano de 9 dígitos (será su clave al iniciar sesión) o una contraseña de al menos 6 caracteres.");
+        setSaving(false);
+        return;
+      }
+    }
     try {
       const body = {
         nombre: nueva.nombre.trim(),
         correo: nueva.correo.trim(),
         rol: nueva.rol,
         estado: nueva.estado,
-        contrasena: nueva.contrasena,
+        ...(pw.length > 0 ? { contrasena: pw } : {}),
+        ...(nueva.rol === "Cliente" && tel.length === 9 ? { telefono: tel } : {}),
       };
       await apiPost("/api/cuentas", body, { auth: true });
       setNueva(emptyNueva);
@@ -70,6 +92,7 @@ export default function Cuentas() {
     setEditForm({
       nombre: c.nombre,
       correo: c.correo,
+      telefono: String(c.telefono ?? "").replace(/\D/g, "").slice(0, 9),
       rol: c.rol,
       estado: c.estado,
       contrasena: "",
@@ -89,6 +112,10 @@ export default function Cuentas() {
         rol: editForm.rol,
         estado: editForm.estado,
       };
+      const et = editForm.telefono.replace(/\D/g, "").slice(0, 9);
+      if (editForm.rol === "Cliente" && et.length === 9) {
+        body.telefono = et;
+      }
       if (editForm.contrasena.length >= 6) {
         body.contrasena = editForm.contrasena;
       }
@@ -123,7 +150,8 @@ export default function Cuentas() {
     <div>
       <h1 style={{ marginBottom: "12px", color: "var(--brand-700)" }}>Cuentas</h1>
       <p style={{ marginBottom: "18px" }}>
-        Alta, baja y edición de clientes y personal. Las contraseñas solo se almacenan hasheadas en el servidor.
+        Alta, baja y edición de clientes y personal. En la web el cliente entra con <strong>nombre + celular</strong> (9
+        dígitos); aquí puedes dar de alta un cliente con ese celular o con contraseña clásica (mín. 6 caracteres).
       </p>
 
       {msg && (
@@ -150,6 +178,21 @@ export default function Cuentas() {
               <option value="Administrador">Administrador</option>
             </select>
           </div>
+          {nueva.rol === "Cliente" ? (
+            <div className="field">
+              <label className="label">
+                Celular web (9 dígitos)<span className="req">*</span>
+              </label>
+              <input
+                className="input"
+                inputMode="numeric"
+                maxLength={9}
+                value={nueva.telefono}
+                onChange={(e) => setNueva((x) => ({ ...x, telefono: e.target.value.replace(/\D/g, "").slice(0, 9) }))}
+                placeholder="Clave en la app pública si no pones contraseña"
+              />
+            </div>
+          ) : null}
           <div className="field">
             <label className="label">Estado</label>
             <select className="input" value={nueva.estado} onChange={(e) => setNueva((x) => ({ ...x, estado: e.target.value }))}>
@@ -164,8 +207,8 @@ export default function Cuentas() {
               type="password"
               value={nueva.contrasena}
               onChange={(e) => setNueva((x) => ({ ...x, contrasena: e.target.value }))}
-              placeholder="Mín. 6 caracteres si la asignas"
-              minLength={6}
+              placeholder="Solo si quieres otra clave distinta al celular (mín. 6 caracteres)"
+              autoComplete="new-password"
             />
           </div>
           <div className="field" style={{ display: "flex", alignItems: "flex-end" }}>
@@ -195,6 +238,19 @@ export default function Cuentas() {
                 <option value="Administrador">Administrador</option>
               </select>
             </div>
+            {editForm.rol === "Cliente" ? (
+              <div className="field">
+                <label className="label">Celular web (9 dígitos)</label>
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  maxLength={9}
+                  value={editForm.telefono}
+                  onChange={(e) => setEditForm((x) => ({ ...x, telefono: e.target.value.replace(/\D/g, "").slice(0, 9) }))}
+                  placeholder="Solo si cambias el número (9 dígitos); vacío = no actualizar celular"
+                />
+              </div>
+            ) : null}
             <div className="field">
               <label className="label">Estado</label>
               <select className="input" value={editForm.estado} onChange={(e) => setEditForm((x) => ({ ...x, estado: e.target.value }))}>
@@ -238,6 +294,8 @@ export default function Cuentas() {
                 <th>ID</th>
                 <th>Nombre</th>
                 <th>Correo</th>
+                <th>Celular</th>
+                <th>WA promo</th>
                 <th>Rol</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -246,7 +304,7 @@ export default function Cuentas() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} style={{ color: "var(--muted)" }}>
+                  <td colSpan={8} style={{ color: "var(--muted)" }}>
                     …
                   </td>
                 </tr>
@@ -258,6 +316,14 @@ export default function Cuentas() {
                       <strong>{cuenta.nombre}</strong>
                     </td>
                     <td>{cuenta.correo}</td>
+                    <td>{cuenta.telefono ?? "—"}</td>
+                    <td>
+                      {cuenta.aceptaMarketingWhatsapp ? (
+                        <span className="badge badge--ok">Sí</span>
+                      ) : (
+                        <span className="badge badge--warn">No</span>
+                      )}
+                    </td>
                     <td>{cuenta.rol}</td>
                     <td>
                       <span className={cuenta.estado === "Activo" ? "badge badge--ok" : "badge badge--warn"}>
