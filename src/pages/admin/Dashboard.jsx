@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import MetricBarChart from "../../components/charts/MetricBarChart";
 import StatusDonutChart from "../../components/charts/StatusDonutChart";
 import { useReservations } from "../../context/ReservationsContext";
@@ -17,14 +18,30 @@ export default function Dashboard() {
     <div className="admin-dashboard">
       <header className="admin-dashboard__head">
         <div>
-          <p className="eyebrow">Minimuestra · panel operativo</p>
-          <h1>Centro de control turístico</h1>
-          <p>Visión real de ocupación, depósitos, canales y riesgo operativo para el servicio en sala.</p>
+          <p className="eyebrow">Métricas en vivo</p>
+          <h1>Operación unificada: sala, reservas y canales digitales</h1>
+          <p>Ocupación, depósitos, estados y riesgo operativo en una sola línea de mando — pensado para restaurantes de alto flujo.</p>
         </div>
         <div className="admin-dashboard__badge">
           <span>●</span> {fecha}
         </div>
       </header>
+
+      <section className="card card--pad admin-dashboard__cta-ops" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h2 className="section-title" style={{ fontSize: "1.15rem", marginBottom: 6 }}>
+              Control en pocos clics
+            </h2>
+            <p className="section-lead" style={{ margin: 0 }}>
+              Confirma reservas, avanza pedidos delivery/recojo, anula o borra desde una sola pantalla.
+            </p>
+          </div>
+          <Link to="/admin/operaciones" className="btn btn--primary">
+            Abrir centro de operación
+          </Link>
+        </div>
+      </section>
 
       <div className="kpi-grid">
         {kpis.map((item) => {

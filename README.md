@@ -1,50 +1,23 @@
-# TRES REGIONES - Mini Demo Profesional
+# Tres Regiones
 
-Aplicacion de demo para un restaurante peruano turistico con dos experiencias:
-
-- **Cliente**: exploracion de carta, registro/login y reserva con politica de deposito.
-- **Administrador**: operacion de sala (dashboard, cuentas, reservas, calendario y perfil de local).
+Aplicación web para operación de restaurante (cliente y administración): carta, pedidos, reservas con política de depósito, cuentas y panel de operación.
 
 ## Stack
 
 - **Frontend:** React 19 + Vite + React Router
-- **Backend:** Node.js HTTP server (sin framework)
-- **Persistencia demo:** `server/data.json`
-- **Auth:** token firmado (JWT-like HMAC) + sesion local
+- **Backend:** Node.js HTTP (sin framework), API bajo `/api`
+- **Persistencia:** JSON en disco (`DATA_FILE` o `server/data.json` por defecto)
+- **Auth:** token firmado (HMAC) + sesión en el cliente
 
-## Quickstart (2 minutos)
+## Desarrollo local
 
-1. Instala dependencias:
+1. `npm install`
+2. `cp .env.example .env` y ajuste variables si lo desea
+3. `npm run dev:all` → front en `http://localhost:5173`, API en `http://127.0.0.1:8787`
 
-```bash
-npm install
-```
+## Credenciales de ejemplo (solo desarrollo)
 
-2. Copia variables de entorno:
-
-```bash
-cp .env.example .env
-```
-
-3. Levanta API + frontend:
-
-```bash
-npm run dev:all
-```
-
-4. Abre:
-- Frontend: `http://localhost:5173`
-- API: `http://127.0.0.1:8787`
-
-## Credenciales demo
-
-### Administrador
-- **Usuario:** `admin`
-- **Clave:** `123456`
-
-### Cliente
-- **Correo:** `cliente@sazon.com`
-- **Clave:** `123456`
+Con el seed por defecto puede usar usuario `admin` y la clave definida en `ADMIN_PASSWORD` (por defecto en `.env.example` es débil a propósito). Cambie siempre estas credenciales antes de exponer el servicio a Internet.
 
 ## Scripts
 
@@ -52,52 +25,31 @@ npm run dev:all
 npm run dev       # solo frontend
 npm run server    # solo backend
 npm run dev:all   # frontend + backend
-npm run test      # pruebas backend (node:test)
+npm run test      # pruebas backend
 npm run lint
-npm run build
-npm run preview
+npm run build     # genera dist/ (usa .env.production para VITE_*)
+npm run start     # sirve API + estáticos desde dist/ (requiere build previo)
 ```
 
-## Rutas principales
+## Producción y contrato
 
-### Cliente
-- `/`
-- `/login`
-- `/register`
-- `/reservar`
-- `/confirmacion`
+Para dominio, HTTPS, build desplegado y datos persistentes sin depender de su máquina de desarrollo, siga **[DEPLOY.md](./DEPLOY.md)** (Docker Compose, Caddy, checklist y variables obligatorias).
 
-### Administrador
-- `/admin/login`
-- `/admin/dashboard`
-- `/admin/cuentas`
-- `/admin/reservas`
-- `/admin/calendario`
-- `/admin/perfil`
+Puntos clave:
 
-## Caracteristicas profesionales incluidas
-
-- Validaciones completas de reservas, cuentas y autenticacion.
-- Asignacion automatica de mesa por zona/capacidad/disponibilidad.
-- Politica de deposito modelada en flujo cliente y gestion admin.
-- Fallback offline de reservas en frontend cuando la API no responde.
-- Headers de seguridad, limite de payload y rate limit basico en la API.
-- Logging de requests con `X-Request-Id`.
+- `NODE_ENV=production` fuerza un `JWT_SECRET` distinto del valor de desarrollo.
+- `GET /api/health` y `GET /api/version` sirven para comprobar despliegue y versiones.
 
 ## Variables de entorno (backend)
 
-Revisa `.env.example`:
+Vea `.env.example` y la tabla en `DEPLOY.md` (`PORT`, `HOST`, `JWT_SECRET`, `ADMIN_*`, `CORS_ORIGIN`, `DATA_FILE`, límites y rate limit).
 
-- `PORT`
-- `JWT_SECRET`
-- `ADMIN_USER`
-- `ADMIN_PASSWORD`
-- `CORS_ORIGIN`
-- `BODY_LIMIT_BYTES`
-- `RATE_LIMIT_WINDOW_MS`
-- `RATE_LIMIT_MAX`
+## Rutas principales
 
-## Estado del proyecto
+**Cliente:** `/`, `/login`, `/register`, `/reservar`, `/confirmacion`, carrito y checkout según configuración del router.
 
-Esta demo esta optimizada para presentacion profesional y entrevistas tecnicas.
-Para pasar a produccion real se recomienda migrar a base de datos, refresh tokens, cookies httpOnly y observabilidad centralizada.
+**Administrador:** `/admin/login`, `/admin/dashboard`, `/admin/operaciones`, cuentas, reservas, calendario, pedidos, perfil.
+
+## Próximos pasos de producto (fuera de este repo)
+
+Para escala enterprise suele sumar: base de datos relacional, refresh tokens, cookies httpOnly, observabilidad centralizada y backups automatizados del almacén de datos.

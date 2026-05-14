@@ -227,6 +227,24 @@ export default function Reservas() {
                       >
                         No show
                       </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: "6px 8px", fontSize: 13 }}
+                        disabled={!ready || updatingId === reserva.id}
+                        onClick={() => cambiarEstado(reserva.id, "Atendida")}
+                      >
+                        Atendida
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: "6px 8px", fontSize: 13 }}
+                        disabled={!ready || updatingId === reserva.id}
+                        onClick={() => cambiarEstado(reserva.id, "Cancelada")}
+                      >
+                        Cancelar
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -240,7 +258,7 @@ export default function Reservas() {
         <div className="card card--pad" style={{ marginTop: 16 }}>
           <h3 style={{ marginBottom: 12, color: "var(--brand-700)" }}>Ficha de reserva · ID {draft.id}</h3>
           <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>
-            No show = mesa liberada; el depósito registrado no se reembolsa en esta demo. Usa notas internas para acuerdos con
+            No show = mesa liberada; el depósito registrado no se reembolsa de forma automática. Usa notas internas para acuerdos con
             agencias u hoteles.
           </p>
 

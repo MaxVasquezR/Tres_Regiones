@@ -60,34 +60,34 @@ export default function Login() {
         <div className="auth-split__overlay auth-gate-hero__overlay-tone" />
 
         <div className="auth-split__story-inner auth-gate-hero__inner">
-          <p className="eyebrow eyebrow--light auth-gate-hero__eyebrow">SaaS · restaurante · Lima</p>
+          <p className="eyebrow eyebrow--light auth-gate-hero__eyebrow">Restaurante · Lima</p>
           <h1 className="auth-gate-hero__title">
-            Llena mesas, cobra más rápido, controla sala desde un solo lugar.
+            Mesas ocupadas, pedidos claros y cobros registrados en un solo flujo.
           </h1>
           <p className="auth-gate-hero__lead">
-            Plataforma pensada para dueños agresivos con la meta: convertir tráfico en tickets, tickets en recurrentes
-            y operación en datos que se venden solos frente a inversionistas.
+            Carta en línea, carrito con delivery, reservas en sala y panel del local: una base lista para operar y
+            para conectar pasarela de pago cuando el negocio lo defina.
           </p>
 
           <div className="auth-gate-kpis" aria-label="Mensajes de valor">
             <article className="auth-gate-kpis__card">
               <span className="auth-gate-kpis__value">1 flujo</span>
-              <span className="auth-gate-kpis__label">Carta, carrito, reserva y confirmación alineados</span>
+              <span className="auth-gate-kpis__label">Carta, pedido, reserva y confirmación alineados</span>
             </article>
             <article className="auth-gate-kpis__card">
-              <span className="auth-gate-kpis__value">0 fricción</span>
-              <span className="auth-gate-kpis__label">Tu cliente entra con nombre + celular y ya compra o separa</span>
+              <span className="auth-gate-kpis__value">Rápido</span>
+              <span className="auth-gate-kpis__label">El cliente entra con nombre y celular y sigue al pedido o reserva</span>
             </article>
             <article className="auth-gate-kpis__card">
-              <span className="auth-gate-kpis__value">∞ escala</span>
-              <span className="auth-gate-kpis__label">Misma base para multi-local, delivery y pagos cuando actives</span>
+              <span className="auth-gate-kpis__value">Escala</span>
+              <span className="auth-gate-kpis__label">Misma base para varios locales, delivery y métodos de pago</span>
             </article>
           </div>
 
           <ul className="auth-split__bullets auth-gate-hero__bullets">
-            <li>Vitrina premium por regiones del Perú: impacto visual que vende la experiencia antes del primer plato.</li>
-            <li>Panel operativo en paralelo: ocupación, pedidos y cuentas con la seriedad que exige una preventa.</li>
-            <li>Listo para enchufar tarjeta, QR y comisiones cuando pases a producción: hoy minimuestra, mañana ingresos.</li>
+            <li>Vitrina por regiones del Perú: la experiencia se entiende antes del primer pedido.</li>
+            <li>Panel operativo: ocupación, pedidos y cuentas con vista para gerencia y sala.</li>
+            <li>Pagos con tarjeta, QR y efectivo se integran con la pasarela que el local elija.</li>
           </ul>
 
           <div className="auth-gate-hero__links">
@@ -107,12 +107,12 @@ export default function Login() {
             <p className="funnel-banner" role="status">
               {from === "/checkout" ? (
                 <>
-                  Completa el acceso para <strong>pagar tu pedido</strong> (tarjeta, QR o efectivo en minimuestra).
+                  Completa el acceso para <strong>confirmar y pagar tu pedido</strong> (tarjeta, QR o efectivo).
                 </>
               ) : (
                 <>
-                  Estás en el <strong>flujo de pedido</strong>: al entrar pasas directo a reserva en sala (minimuestra).
-                  Pagos QR/tarjeta y delivery +S/ 10 se conectarán en la versión comercial.
+                  Estás en el <strong>flujo de pedido o reserva</strong>: al entrar continúas hacia sala o checkout con
+                  los mismos datos de contacto.
                 </>
               )}
             </p>
@@ -168,7 +168,7 @@ export default function Login() {
           </form>
 
           <p className="demo-credential">
-            Demo: nombre <strong>Mayra Cliente Demo</strong> · celular <strong>999888777</strong>
+            Acceso de evaluación: <strong>Mayra Cliente Demo</strong> · celular <strong>999888777</strong> (como contraseña)
           </p>
 
           <p className="hint">

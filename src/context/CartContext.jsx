@@ -8,6 +8,7 @@ const emptyDireccion = () => ({
   distrito: "",
   urbanizacion: "",
   referencia: "",
+  etiqueta: "",
   lat: null,
   lng: null,
   fuente: "",
@@ -47,6 +48,7 @@ export function CartProvider({ children }) {
     return {
       ...base,
       ...s,
+      etiqueta: String(s.etiqueta ?? base.etiqueta).slice(0, 240),
       lat: Number.isFinite(lat) ? Math.round(lat * 1e6) / 1e6 : null,
       lng: Number.isFinite(lng) ? Math.round(lng * 1e6) / 1e6 : null,
       fuente: fu === "gps" || fu === "mapa" || fu === "manual" ? fu : "",
@@ -138,8 +140,8 @@ export function CartProvider({ children }) {
         const f = String(patch.fuente).toLowerCase();
         next.fuente = f === "gps" || f === "mapa" || f === "manual" ? f : "";
       }
-      if (patch.etiqueta && !String(d.referencia ?? "").trim()) {
-        next.referencia = String(patch.etiqueta).slice(0, 200);
+      if (patch.etiqueta !== undefined) {
+        next.etiqueta = String(patch.etiqueta ?? "").slice(0, 240);
       }
       return next;
     });
@@ -157,7 +159,15 @@ export function CartProvider({ children }) {
         return { ...d, fuente: ok ? f : "" };
       }
       const max =
-        key === "referencia" ? 200 : key === "distrito" ? 80 : key === "urbanizacion" ? 80 : 160;
+        key === "referencia"
+          ? 200
+          : key === "distrito"
+            ? 80
+            : key === "urbanizacion"
+              ? 80
+              : key === "etiqueta"
+                ? 240
+                : 160;
       return { ...d, [key]: String(value ?? "").slice(0, max) };
     });
   }, []);

@@ -116,7 +116,7 @@ export default function Home() {
               <p className="eyebrow eyebrow--light">Sesión activa</p>
               <h1 className="hero__title">Hola, {nombreCliente}</h1>
               <p className="hero__subtitle">
-                Sigue con tu pedido o reserva en sala. El panel del local sigue disponible para la demo comercial.
+                Continúa tu pedido o reserva en sala. El equipo del local gestiona todo desde el panel operativo.
               </p>
               <div className="hero__actions">
                 <Link to="/carrito" className="btn btn--light">
@@ -132,7 +132,7 @@ export default function Home() {
                   Panel del local
                 </Link>
               </div>
-              <div className="hero__stats" aria-label="Indicadores de la minimuestra">
+              <div className="hero__stats" aria-label="Servicio">
                 {highlights.map((h) => (
                   <article key={h.label} className="hero__stat">
                     <span className="hero__stat-value">{h.value}</span>
@@ -157,11 +157,11 @@ export default function Home() {
             <div className="section-heading">
               <p className="eyebrow">Carta · tres regiones</p>
               <h2 id="menu-heading" className="section-title">
-                {nombreCliente}, catálogo de la minimuestra
+                {nombreCliente}, nuestra carta
               </h2>
               <p className="section-lead">
-                Aquí se amplía la oferta: más platos, upsells y pagos en la versión comercial. Arriba ya viste el
-                gancho; abajo está la prueba de profundidad para socios e inversores.
+                Platos representativos de costa, sierra y selva. Añade al carrito y define delivery o recojo antes de
+                pagar.
               </p>
             </div>
 

@@ -7,9 +7,9 @@ import { obtenerSesion } from "../../session";
 import DeliveryAddressEditor from "../../components/DeliveryAddressEditor";
 
 const METHODS = [
-  { id: "card", title: "Tarjeta", desc: "Visa, Mastercard — pasarela Culqi / Niubiz (integración comercial)." },
-  { id: "qr", title: "QR · Yape / Plin", desc: "Pago móvil con código de cobro. Aquí generamos el string de referencia." },
-  { id: "cash", title: "Efectivo", desc: "Pago al rider o en caja al recoger. El local confirma en panel." },
+  { id: "card", title: "Tarjeta", desc: "Visa, Mastercard u otras habilitadas por el local." },
+  { id: "qr", title: "QR · Yape / Plin", desc: "Pago móvil con código de cobro generado para tu pedido." },
+  { id: "cash", title: "Efectivo", desc: "Pago al repartidor o en caja al recoger. El local confirma en panel." },
 ];
 
 function contactoInicialDesdeSesion() {
@@ -72,7 +72,7 @@ export default function Checkout() {
             {method === "qr" && done.qrPayload ? (
               <div className="checkout-qr">
                 <p className="label" style={{ marginBottom: 8 }}>
-                  Escanea con Yape / Plin (demo)
+                  Escanea con Yape / Plin
                 </p>
                 <div className="checkout-qr__box">
                   <QRCodeSVG value={done.qrPayload} size={200} level="M" includeMargin />
@@ -120,7 +120,7 @@ export default function Checkout() {
     if (method === "card") {
       const digits = cardNumber.replace(/\D/g, "");
       if (digits.length < 15 || !cardName.trim() || !cardExpiry.trim() || !String(cardCvv).trim()) {
-        setError("Completa datos de tarjeta (número, titular, vencimiento y CVV) para la simulación.");
+        setError("Completa número de tarjeta, titular, vencimiento y CVV para continuar.");
         return;
       }
     }
@@ -165,7 +165,7 @@ export default function Checkout() {
     <div className="booking-page">
       <div className="container container--wide">
         <header className="booking-page__head booking__intro">
-          <p className="eyebrow">Pago seguro · minimuestra</p>
+          <p className="eyebrow">Pago y confirmación</p>
           <h1 className="section-title">Checkout</h1>
           <p className="section-lead">
             {delivery
@@ -180,8 +180,7 @@ export default function Checkout() {
               Dirección de entrega
             </h2>
             <p className="hint" style={{ marginBottom: 14 }}>
-              Misma experiencia que en el carrito: GPS, mapa con pin o solo texto. Pago anticipado; el rider usa calle,
-              distrito y referencia.
+              Misma dirección que en el carrito: GPS, mapa con pin o texto. El reparto usa calle, distrito y referencia.
             </p>
             <DeliveryAddressEditor />
           </div>
@@ -364,7 +363,7 @@ export default function Checkout() {
                   <input
                     className="input"
                     inputMode="numeric"
-                    placeholder="4539 … (demo)"
+                    placeholder="Número de tarjeta"
                     value={cardNumber}
                     onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, "").slice(0, 19))}
                     autoComplete="cc-number"
@@ -379,16 +378,16 @@ export default function Checkout() {
                   <input className="input" type="password" maxLength={4} value={cardCvv} onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ""))} autoComplete="cc-csc" />
                 </div>
                 <p className="notice notice--spaced" style={{ gridColumn: "1 / -1" }}>
-                  Datos solo para simulación UI. En producción: tokenización PCI (Culqi, Niubiz, Mercado Pago) sin
-                  tocar PAN en tu servidor.
+                  El cargo se registra en este entorno de piloto según la configuración del local. En producción, los
+                  datos de tarjeta se tokenizan en la pasarela certificada (PCI DSS); no se almacenan en texto plano.
                 </p>
               </div>
             ) : null}
 
             {method === "qr" ? (
               <p className="notice notice--spaced" style={{ marginTop: 16 }}>
-                Tras confirmar generaremos el <strong>código de operación</strong> y el <strong>QR</strong> con el
-                payload para Yape/Plin (demo).
+                Tras confirmar verás el <strong>código de operación</strong> y el <strong>código QR</strong> para pagar
+                con Yape o Plin.
               </p>
             ) : null}
 

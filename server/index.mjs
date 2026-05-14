@@ -1,4 +1,5 @@
 import http from "node:http";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -15,8 +16,21 @@ import { distReady, tryServeStatic } from "./static.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "0.0.0.0";
-const DATA_PATH = path.join(__dirname, "data.json");
+const DATA_PATH = process.env.DATA_FILE
+  ? path.resolve(process.env.DATA_FILE)
+  : path.join(__dirname, "data.json");
 const SEED_PATH = path.join(__dirname, "seed.json");
+
+function readPackageVersion() {
+  try {
+    const raw = fsSync.readFileSync(path.join(__dirname, "..", "package.json"), "utf8");
+    const j = JSON.parse(raw);
+    return String(j.version || "0.0.0");
+  } catch {
+    return "0.0.0";
+  }
+}
+const APP_VERSION = readPackageVersion();
 
 function normalizarUsuarioAdmin(u) {
   return String(u ?? "")
@@ -36,10 +50,42 @@ const BODY_LIMIT_BYTES = Number(process.env.BODY_LIMIT_BYTES || 1024 * 64);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000);
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 120);
 
+function assertProductionSafe() {
+  const nodeEnv = process.env.NODE_ENV || "development";
+  if (nodeEnv !== "production") return;
+  const secret = process.env.JWT_SECRET || "";
+  if (!secret || secret === "tres-regiones-dev-secret-cambiar") {
+    console.error(
+      "[FATAL] NODE_ENV=production exige JWT_SECRET único (no use el secreto por defecto de desarrollo).",
+    );
+    process.exit(1);
+  }
+  const adminPwd = String(process.env.ADMIN_PASSWORD || "");
+  if (adminPwd.length < 8) {
+    console.warn("[WARN] ADMIN_PASSWORD corto en producción. Use al menos 8 caracteres fuertes.");
+  }
+  if (CORS_ORIGIN === "*") {
+    console.warn(
+      "[WARN] CORS_ORIGIN=* en producción. Defina el origen exacto del sitio (p. ej. https://su-dominio.com).",
+    );
+  }
+}
+
 const DEPOSITO_SOLES = 20;
 const CANALES_VALIDOS = new Set(["Web", "Mostrador", "Teléfono", "Agencia", "OTAs", "Evento"]);
 const ROLES_CUENTA = new Set(["Cliente", "Administrador"]);
 const ESTADOS_CUENTA = new Set(["Activo", "Inactivo"]);
+const ESTADOS_PEDIDO_ADMIN = new Set([
+  "Pendiente_caja",
+  "Pagado_simulado_tarjeta",
+  "Pendiente_confirmacion_QR",
+  "Confirmado_cocina",
+  "Listo_recojo",
+  "En_reparto",
+  "Entregado",
+  "Cerrado",
+  "Anulado",
+]);
 
 const MESAS = [
   { codigo: "M1", capacidad: 2, zona: "Salón principal" },
@@ -96,6 +142,8 @@ async function ensureDataFile() {
   try {
     await fs.access(DATA_PATH);
   } catch {
+    const dir = path.dirname(DATA_PATH);
+    await fs.mkdir(dir, { recursive: true });
     const seed = await fs.readFile(SEED_PATH, "utf8");
     await fs.writeFile(DATA_PATH, seed, "utf8");
   }
@@ -372,7 +420,7 @@ function direccionDesdeNominatimPlace(data) {
 async function nominatimFetchJson(urlStr) {
   const res = await fetch(urlStr, {
     headers: {
-      "User-Agent": "TresRegionesMinimuestra/1.0 (demo preventa)",
+      "User-Agent": "TresRegiones/1.0 (geocoding; +https://www.openstreetmap.org/copyright)",
       Accept: "application/json",
     },
   });
@@ -406,7 +454,29 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.method === "GET" && pathname === "/api/health") {
-      json(res, 200, { ok: true, service: "tres-regiones-api", port: PORT });
+      const staticOn = await distReady();
+      let datastoreOk = false;
+      try {
+        await readStore();
+        datastoreOk = true;
+      } catch {
+        datastoreOk = false;
+      }
+      const nodeEnv = process.env.NODE_ENV || "development";
+      json(res, 200, {
+        ok: true,
+        service: "tres-regiones",
+        version: APP_VERSION,
+        port: PORT,
+        static: staticOn,
+        datastore: datastoreOk,
+        env: nodeEnv,
+      });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/version") {
+      json(res, 200, { service: "tres-regiones", version: APP_VERSION });
       return;
     }
 
@@ -465,15 +535,15 @@ const server = http.createServer(async (req, res) => {
       }
       const { searchParams } = parsePath(req.url || "/");
       const q = normalizarTexto(searchParams.get("q") || "");
-      if (q.length < 4) {
-        json(res, 422, { error: "Escribe al menos 4 caracteres para buscar." });
+      if (q.length < 3) {
+        json(res, 422, { error: "Escribe al menos 3 caracteres para buscar." });
         return;
       }
       try {
         const u = new URL("https://nominatim.openstreetmap.org/search");
         u.searchParams.set("format", "jsonv2");
         u.searchParams.set("q", `${q}, Lima, Peru`);
-        u.searchParams.set("limit", "6");
+        u.searchParams.set("limit", "8");
         u.searchParams.set("accept-language", "es");
         const arr = await nominatimFetchJson(u.toString());
         const list = Array.isArray(arr) ? arr : [];
@@ -626,6 +696,7 @@ const server = http.createServer(async (req, res) => {
               distrito: normalizarTexto(direccionRaw.distrito ?? "").slice(0, 80),
               urbanizacion: normalizarTexto(direccionRaw.urbanizacion ?? "").slice(0, 80),
               referencia: normalizarTexto(direccionRaw.referencia ?? "").slice(0, 200),
+              etiqueta: normalizarTexto(direccionRaw.etiqueta ?? "").slice(0, 240),
               lat: Number.isFinite(Number(direccionRaw.lat)) ? Number(direccionRaw.lat) : null,
               lng: Number.isFinite(Number(direccionRaw.lng)) ? Number(direccionRaw.lng) : null,
               fuente: ["gps", "mapa", "manual"].includes(String(direccionRaw.fuente || "").toLowerCase())
@@ -641,11 +712,71 @@ const server = http.createServer(async (req, res) => {
         codigoPago,
         qrPayload,
         estado,
+        notasOperacion: "",
         creadoEn: new Date().toISOString(),
       };
       store.pedidos.push(pedido);
       await writeStore(store);
       json(res, 201, { data: pedido });
+      return;
+    }
+
+    const pedidoIdMatch = pathname.match(/^\/api\/pedidos\/(\d+)$/);
+    if (pedidoIdMatch && req.method === "PATCH") {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(pedidoIdMatch[1]);
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__") {
+        json(res, 413, { error: "El payload excede el tamaño máximo permitido." });
+        return;
+      }
+      if (!body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const idx = store.pedidos.findIndex((p) => Number(p.id) === id);
+      if (idx === -1) {
+        json(res, 404, { error: "Pedido no encontrado." });
+        return;
+      }
+      const cur = store.pedidos[idx];
+      const next = { ...cur };
+      if (body.estado === undefined && body.notasOperacion === undefined) {
+        json(res, 422, { error: "Indica estado o notas de operación." });
+        return;
+      }
+      if (body.estado !== undefined) {
+        const es = String(body.estado ?? "").trim();
+        if (!ESTADOS_PEDIDO_ADMIN.has(es)) {
+          json(res, 422, { error: "Estado de pedido no válido." });
+          return;
+        }
+        next.estado = es;
+      }
+      if (body.notasOperacion !== undefined) {
+        next.notasOperacion = normalizarTexto(body.notasOperacion ?? "").slice(0, 500);
+      }
+      store.pedidos[idx] = next;
+      await writeStore(store);
+      json(res, 200, { data: store.pedidos[idx] });
+      return;
+    }
+
+    if (pedidoIdMatch && req.method === "DELETE") {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(pedidoIdMatch[1]);
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const idx = store.pedidos.findIndex((p) => Number(p.id) === id);
+      if (idx === -1) {
+        json(res, 404, { error: "Pedido no encontrado." });
+        return;
+      }
+      store.pedidos.splice(idx, 1);
+      await writeStore(store);
+      json(res, 200, { ok: true });
       return;
     }
 
@@ -1253,6 +1384,8 @@ await ensureDataFile();
     await writeStore(store);
   }
 }
+
+assertProductionSafe();
 
 server.listen(PORT, HOST, () => {
   const staticReady = distReady();

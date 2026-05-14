@@ -46,7 +46,7 @@ export default function Confirmacion() {
                       mesaDestacada={reserva.mesa}
                       zonaDefault={reserva.zona}
                       titulo="Tu mesa en el plano del local"
-                      subtitulo="Vista previa comercial para preventa: salón interior y terraza. El equipo recibe la misma referencia en panel."
+                      subtitulo="Salón interior y terraza. El equipo recibe la misma referencia en panel."
                       variant="showcase"
                     />
                   </div>
@@ -55,14 +55,13 @@ export default function Confirmacion() {
             ) : (
               <>
                 <p className="section-lead">
-                  Tu cuenta quedó lista. El siguiente paso agresivo es simple: entra, arma tu flujo en sala y, cuando
-                  activemos comercio, aquí mismo pagarás con tarjeta o QR y podrás sumar delivery (+S/ 10) si lo
-                  permites.
+                  Tu cuenta está lista. Inicia sesión para armar tu pedido o reserva; pagos y delivery siguen el flujo
+                  que el local tenga habilitado.
                 </p>
                 {location.state?.funnel === "pedido" ? (
                   <p className="notice notice--spaced">
-                    Venías del <strong>flujo de pedido</strong>: inicia sesión y continúa hacia reserva para cerrar la
-                    minimuestra con datos reales en panel.
+                    Venías del <strong>pedido o checkout</strong>: entra con tu cuenta y continúa en el carrito o en
+                    reservas. El local ve el detalle en su panel operativo.
                   </p>
                 ) : null}
               </>

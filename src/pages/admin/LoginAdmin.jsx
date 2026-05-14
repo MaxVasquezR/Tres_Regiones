@@ -106,7 +106,7 @@ export default function LoginAdmin() {
           </form>
 
           <p className="hint">
-            Demo visitante (web): <strong>Mayra Cliente Demo</strong> + celular <strong>999888777</strong>
+            Evaluación web: <strong>Mayra Cliente Demo</strong> · celular <strong>999888777</strong>
           </p>
 
           <p className="hint">

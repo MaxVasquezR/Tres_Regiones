@@ -1,0 +1,19 @@
+# Renombre a fly.toml y ejecute: fly launch / fly deploy
+# Ajuste app, region y variables secretas (JWT_SECRET, ADMIN_PASSWORD, CORS_ORIGIN).
+
+app = "tres-regiones"
+primary_region = "lim"
+
+[build]
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

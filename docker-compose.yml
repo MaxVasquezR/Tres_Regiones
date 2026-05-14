@@ -1,0 +1,21 @@
+services:
+  tres-regiones:
+    build: .
+    image: tres-regiones:latest
+    ports:
+      - "${HOST_PORT:-8787}:8787"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8787"
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en un archivo .env junto a este compose}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD en .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:?Defina CORS_ORIGIN con la URL pública del sitio, p. ej. https://su-dominio.com}
+      DATA_FILE: /data/data.json
+    volumes:
+      - appdata:/data
+    restart: unless-stopped
+
+volumes:
+  appdata:

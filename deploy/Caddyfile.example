@@ -1,0 +1,12 @@
+# Copie a su servidor como Caddyfile y ajuste el dominio.
+# Requiere que la app escuche en 127.0.0.1:8787 (o use el nombre del servicio Docker en red interna).
+
+{$SITE_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy 127.0.0.1:8787
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}

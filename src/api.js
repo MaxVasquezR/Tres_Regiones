@@ -15,10 +15,10 @@ function headersJson(auth) {
   return h;
 }
 
-export async function apiGet(pathname, { auth = false } = {}) {
+export async function apiGet(pathname, { auth = false, signal } = {}) {
   let res;
   try {
-    res = await fetch(apiUrl(pathname), { headers: auth ? headersJson(true) : {} });
+    res = await fetch(apiUrl(pathname), { headers: auth ? headersJson(true) : {}, signal });
   } catch {
     throw new Error("No pudimos conectar con el servidor. Intenta de nuevo en unos minutos.");
   }

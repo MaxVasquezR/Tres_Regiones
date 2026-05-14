@@ -17,6 +17,7 @@ import Reservas from "./pages/admin/Reservas";
 import Calendario from "./pages/admin/Calendario";
 import PerfilLocal from "./pages/admin/PerfilLocal";
 import Pedidos from "./pages/admin/Pedidos";
+import CentroOperaciones from "./pages/admin/CentroOperaciones";
 import { RequireAdminAuth, RequireClientAuth } from "./components/RouteGuards";
 import CatchAllRedirect from "./components/CatchAllRedirect";
 
@@ -69,6 +70,14 @@ export default function AppRouter() {
           element={(
             <RequireAdminAuth>
               <Dashboard />
+            </RequireAdminAuth>
+          )}
+        />
+        <Route
+          path="/admin/operaciones"
+          element={(
+            <RequireAdminAuth>
+              <CentroOperaciones />
             </RequireAdminAuth>
           )}
         />

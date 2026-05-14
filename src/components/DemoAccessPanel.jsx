@@ -1,22 +1,22 @@
 const pilares = [
   {
     title: "Sala y turismo",
-    copy: "El visitante vive un recorrido premium: conoce la oferta de tres regiones y separa mesa antes de llegar al local en Lima.",
+    copy: "El comensal conoce la oferta de tres regiones y puede separar mesa antes de llegar al local en Lima.",
   },
   {
     title: "Mesa bajo control",
-    copy: "Turno, ambiente y mesa elegidos con claridad operativa: la misma lógica que escalará con más salas y horarios.",
+    copy: "Turno, ambiente y mesa con criterio operativo: base para ampliar salas, horarios y políticas del restaurante.",
   },
   {
     title: "Operación con vista",
-    copy: "El equipo revisa ocupación, depósitos y estados en un panel serio, pensado para dueños e inversionistas en preventa.",
+    copy: "Ocupación, depósitos y estados en un panel pensado para dueños, gerencia y equipo de sala.",
   },
 ];
 
 const regiones = [
   {
     title: "Costa",
-    copy: "Mar, limón y calor limeño: piqueos y clásicos que reciben al viajero que aterriza en la capital.",
+    copy: "Mar, limón y calor limeño: piqueos y clásicos que reciben al visitante en la capital.",
   },
   {
     title: "Sierra",
@@ -30,13 +30,13 @@ const regiones = [
 
 export default function DemoAccessPanel() {
   return (
-    <div className="experience-guide" role="region" aria-label="Propuesta de valor · minimuestra">
+    <div className="experience-guide" role="region" aria-label="Propuesta de valor">
       <div className="experience-guide__intro">
-        <p className="eyebrow">Preventa comercial</p>
-        <h2 className="section-title">Plataforma lista para mostrar, no para improvisar</h2>
+        <p className="eyebrow">Tres Regiones</p>
+        <h2 className="section-title">Experiencia de marca, operación ordenada</h2>
         <p className="section-lead">
-          Esta interfaz ocupa la pantalla de forma deliberada: impacto visual para socios, flujo claro para el visitante
-          y panel administrativo alineado con la operación real. Los datos se ampliarán en la versión productiva.
+          Interfaz pensada para impacto en sala y claridad en el pedido: carta, delivery con dirección precisa y
+          reservas enlazadas al panel del local.
         </p>
       </div>
 

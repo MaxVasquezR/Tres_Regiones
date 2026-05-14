@@ -136,7 +136,7 @@ export default function ReservarMesa() {
       <div className="container container--wide">
         <div className="booking">
           <div className="booking-page__head booking__intro">
-          <p className="eyebrow">Reserva en sala · minimuestra</p>
+          <p className="eyebrow">Reserva en sala</p>
           <h1 className="section-title">Tu mesa en TRES REGIONES</h1>
           <p className="section-lead">
             Flujo profesional para turismo presencial en Lima: turno, mapa de sala y confirmación con política clara.
@@ -259,7 +259,7 @@ export default function ReservarMesa() {
                   mesaDestacada={form.mesa}
                   zonaDefault={form.zona}
                   titulo="Así queda tu mesa en el plano"
-                  subtitulo="Mismo esquema que recibirás en la confirmación. Ideal para enseñar en demo a socios e inversionistas."
+                  subtitulo="Mismo formato que en la confirmación: resumen claro para el comensal y para sala."
                   variant="inline"
                 />
               </div>

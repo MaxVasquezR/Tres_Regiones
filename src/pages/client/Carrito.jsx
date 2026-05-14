@@ -26,8 +26,8 @@ export default function Carrito() {
           <p className="eyebrow">Pedido a domicilio o recojo</p>
           <h1 className="section-title">Tu carrito</h1>
           <p className="section-lead">
-            Selecciona platos desde la carta, activa delivery si aplica (+S/ {deliveryFee}) y completa la dirección. El
-            pago con tarjeta real se conectará a Culqi, Niubiz o similar; aquí tienes el flujo completo de minimuestra.
+            Elige platos desde la carta, activa delivery si aplica (+S/ {deliveryFee}) y completa la dirección con GPS,
+            mapa o texto. El pago se confirma en este flujo; la pasarela se integra según el acuerdo comercial del local.
           </p>
         </header>
 
@@ -47,7 +47,7 @@ export default function Carrito() {
                 <h2 className="section-title" style={{ fontSize: "1.35rem", marginBottom: 16 }}>
                   Platos
                 </h2>
-                <div className="table-wrap">
+                <div className="cart-table-desktop table-wrap">
                   <table className="cart-table">
                     <thead>
                       <tr>
@@ -93,6 +93,42 @@ export default function Carrito() {
                     </tbody>
                   </table>
                 </div>
+                <div className="cart-cards-mobile" aria-label="Platos en el carrito">
+                  {items.map((row) => (
+                    <article key={row.platoId} className="cart-line-card card">
+                      <div className="cart-line-card__main">
+                        {row.imagen ? (
+                          <img src={row.imagen} alt="" className="cart-line-card__img" width={64} height={64} />
+                        ) : (
+                          <div className="cart-line-card__img cart-line-card__img--ph" aria-hidden />
+                        )}
+                        <div className="cart-line-card__body">
+                          <h3 className="cart-line-card__name">{row.nombre}</h3>
+                          <p className="cart-line-card__meta">
+                            S/ {row.precioSoles.toFixed(2)} c/u · <strong>S/ {(row.precioSoles * row.qty).toFixed(2)}</strong>
+                          </p>
+                          <div className="cart-line-card__row">
+                            <label className="label cart-line-card__qty-label" htmlFor={`qty-${row.platoId}`}>
+                              Cantidad
+                            </label>
+                            <input
+                              id={`qty-${row.platoId}`}
+                              type="number"
+                              min={1}
+                              max={20}
+                              className="input cart-line-card__qty"
+                              value={row.qty}
+                              onChange={(e) => setQty(row.platoId, e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <button type="button" className="btn btn--surface btn--block cart-line-card__remove" onClick={() => removeLine(row.platoId)}>
+                        Quitar del carrito
+                      </button>
+                    </article>
+                  ))}
+                </div>
               </div>
 
               <div className="card card--pad cart-delivery">
@@ -102,8 +138,8 @@ export default function Carrito() {
                 <label className="policy-check" style={{ marginTop: 0 }}>
                   <input type="checkbox" checked={delivery} onChange={(e) => setDelivery(e.target.checked)} />
                   <span>
-                    <strong>Delivery a domicilio</strong> (+S/ {deliveryFee}). Si no marcas, asumimos recojo en el
-                    local (Av. Javier Prado — minimuestra).
+                    <strong>Delivery a domicilio</strong> (+S/ {deliveryFee}). Si no marcas, el pedido queda para recojo
+                    en el local (Av. Javier Prado).
                   </span>
                 </label>
 
