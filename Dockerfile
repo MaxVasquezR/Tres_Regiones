@@ -20,6 +20,8 @@ RUN apk add --no-cache wget \
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json ./
 COPY server ./server
+# Usuario no-root no puede escribir bajo /app/server; datos en /data (montar disco en Render si quieres persistencia).
+ENV DATA_FILE=/data/data.json
 USER nodejs
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

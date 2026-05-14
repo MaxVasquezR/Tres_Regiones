@@ -73,6 +73,8 @@ Patrón general (Node **20+** en desarrollo; imagen Docker con Node 22):
 3. Defina las mismas variables en el panel del proveedor.
 4. Disco persistente: configure volumen o almacenamiento para `DATA_FILE` (sin volumen, los datos se pierden al redeploy).
 
+En **Render** con la imagen de este repo, el `Dockerfile` ya define `DATA_FILE=/data/data.json`. Añada un **Persistent Disk** montado en `/data` si necesita que reservas y pedidos sobrevivan a reinicios.
+
 Plantilla opcional: `fly.toml.example` (renombrar y ajustar `app` / `primary_region`).
 
 ## Checklist antes de ofrecer el producto
