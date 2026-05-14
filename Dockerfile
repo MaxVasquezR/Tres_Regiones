@@ -18,8 +18,8 @@ RUN apk add --no-cache wget \
   && mkdir -p /data \
   && chown nodejs:nodejs /data
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/server ./server
 COPY --from=build /app/package.json ./
+COPY server ./server
 USER nodejs
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

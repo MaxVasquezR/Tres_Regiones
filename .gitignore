@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Secrets (nunca subir)
+.env
+.env.*
+!.env.example
+!.env.production
+
 # API demo (se regenera desde server/seed.json al iniciar)
 server/data.json
 
