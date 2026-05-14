@@ -1,21 +1,17 @@
+# Blueprint Render: https://render.com/docs/blueprint-spec
+# Tras conectar el repo, Render pedirá ADMIN_PASSWORD; JWT_SECRET se genera solo.
+# CORS: si no defines CORS_ORIGIN, la API usa RENDER_EXTERNAL_URL (lo inyecta Render).
+
 services:
   - type: web
     name: tres-regiones
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: HOST
-        value: 0.0.0.0
       - key: JWT_SECRET
         generateValue: true
       - key: ADMIN_USER
         value: admin
       - key: ADMIN_PASSWORD
-        value: "123456"
-      - key: CORS_ORIGIN
-        value: "*"
+        sync: false

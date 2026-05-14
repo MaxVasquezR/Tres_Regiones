@@ -33,12 +33,14 @@ npm run start     # sirve API + estáticos desde dist/ (requiere build previo)
 
 ## Producción y contrato
 
-Para dominio, HTTPS, build desplegado y datos persistentes sin depender de su máquina de desarrollo, siga **[DEPLOY.md](./DEPLOY.md)** (Docker Compose, Caddy, checklist y variables obligatorias).
+Para dominio, HTTPS, build desplegado y datos persistentes sin depender de su máquina de desarrollo, siga **[DEPLOY.md](./DEPLOY.md)** (Docker Compose, Caddy, **Render** con Docker, checklist y variables).
 
 Puntos clave:
 
 - `NODE_ENV=production` fuerza un `JWT_SECRET` distinto del valor de desarrollo.
+- En **Render**, si no define `CORS_ORIGIN`, la API usa la URL pública `RENDER_EXTERNAL_URL`.
 - `GET /api/health` y `GET /api/version` sirven para comprobar despliegue y versiones.
+- Opcional: blueprint **[render.yaml](./render.yaml)** en la raíz del repo.
 
 ## Variables de entorno (backend)
 

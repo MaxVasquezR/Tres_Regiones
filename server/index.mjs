@@ -45,7 +45,9 @@ const ADMIN_PEPPER = `admin:${ADMIN_USER}`;
 const ADMIN_PASSWORD_HASH = hashPasswordDeterministic(ADMIN_PASSWORD, ADMIN_PEPPER);
 
 const TOKEN_TTL_SEC = 60 * 60 * 24 * 7;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+const CORS_EXPLICIT = String(process.env.CORS_ORIGIN ?? "").trim();
+const RENDER_PUBLIC_URL = String(process.env.RENDER_EXTERNAL_URL ?? "").trim();
+const CORS_ORIGIN = CORS_EXPLICIT || RENDER_PUBLIC_URL || "*";
 const BODY_LIMIT_BYTES = Number(process.env.BODY_LIMIT_BYTES || 1024 * 64);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 60_000);
 const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX || 120);
