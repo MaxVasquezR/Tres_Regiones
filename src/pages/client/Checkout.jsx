@@ -1,414 +1,277 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { apiPost } from "../../api";
+import { apiGet, apiPost } from "../../api";
 import { useCart } from "../../context/CartContext";
-import { obtenerSesion } from "../../session";
+import DeliveryMapPicker from "../../components/DeliveryMapPicker";
 import DeliveryAddressEditor from "../../components/DeliveryAddressEditor";
 
-const METHODS = [
-  { id: "card", title: "Tarjeta", desc: "Visa, Mastercard u otras habilitadas por el local." },
-  { id: "qr", title: "QR · Yape / Plin", desc: "Pago móvil con código de cobro generado para tu pedido." },
-  { id: "cash", title: "Efectivo", desc: "Pago al repartidor o en caja al recoger. El local confirma en panel." },
+const STEPS = [
+  { id: "entrega", label: "Entrega", icon: "📍" },
+  { id: "pago", label: "Pago", icon: "💳" },
 ];
-
-function contactoInicialDesdeSesion() {
-  const s = obtenerSesion();
-  if (!s || s.role !== "client") return { nombre: "", telefono: "" };
-  return {
-    nombre: String(s.nombreCompleto || s.nombre || "").trim(),
-    telefono: String(s.telefono || "")
-      .replace(/\D/g, "")
-      .slice(0, 9),
-  };
-}
+const METODOS = [
+  { id: "qr", label: "Yape / Plin", icon: "📱" },
+  { id: "card", label: "Tarjeta", icon: "💳" },
+  { id: "cash", label: "Efectivo al recibir", icon: "💵" },
+];
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { items, delivery, direccion, subtotalSoles, deliverySoles, totalSoles, clearCart } = useCart();
-  const ini = contactoInicialDesdeSesion();
-  const [contactoNombre, setContactoNombre] = useState(ini.nombre);
-  const [contactoTelefono, setContactoTelefono] = useState(ini.telefono);
-  const [solicitaComprobante, setSolicitaComprobante] = useState(false);
-  const [tipoComprobante, setTipoComprobante] = useState("boleta");
-  const [docComprobante, setDocComprobante] = useState("");
-  const [razonComprobante, setRazonComprobante] = useState("");
-  const [method, setMethod] = useState("card");
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvv, setCardCvv] = useState("");
+  const { items, subtotal, descuentoSoles, promo, clear } = useCart();
+
+  const [zonas, setZonas] = useState([]);
+  const [sedes, setSedes] = useState([]);
+  const [step, setStep] = useState(0);
+  const [direccion, setDireccion] = useState({ calle: "", distrito: "", referencia: "", celularContacto: "" });
+  const [sedeId, setSedeId] = useState(null);
+  const [metodo, setMetodo] = useState("qr");
+  const [cardLast4, setCardLast4] = useState("");
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(null);
+  const [enviando, setEnviando] = useState(false);
 
-  if (items.length === 0 && !done) {
-    return (
-      <div className="booking-page">
-        <div className="container container--wide">
-          <div className="card card--pad cart-empty">
-            <p className="section-lead cart-empty__lead">
-              No hay productos para pagar. Arma tu carrito primero.
-            </p>
-            <Link to="/carrito" className="btn btn--primary">
-              Ir al carrito
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    (async () => {
+      try {
+        const [z, s] = await Promise.all([apiGet("/api/zonas-delivery"), apiGet("/api/sedes")]);
+        setZonas(Array.isArray(z.data) ? z.data : []);
+        setSedes(Array.isArray(s.data) ? s.data : []);
+      } catch {
+        setZonas([]);
+      }
+    })();
+  }, []);
 
-  if (done) {
-    return (
-      <div className="booking-page">
-        <div className="container container--narrow">
-          <div className="card card--pad checkout-result">
-            <p className="eyebrow">Pedido registrado</p>
-            <h1 className="section-title">Código: {done.codigoPago}</h1>
-            <p className="section-lead">
-              Total <strong>S/ {Number(done.totalSoles).toFixed(2)}</strong> · Estado: <strong>{done.estado}</strong>
-            </p>
-            {method === "qr" && done.qrPayload ? (
-              <div className="checkout-qr">
-                <p className="label" style={{ marginBottom: 8 }}>
-                  Escanea con Yape / Plin
-                </p>
-                <div className="checkout-qr__box">
-                  <QRCodeSVG value={done.qrPayload} size={200} level="M" includeMargin />
-                </div>
-                <p className="hint" style={{ marginTop: 12 }}>
-                  Payload: <code className="checkout-code">{done.qrPayload}</code>
-                </p>
-              </div>
-            ) : null}
-            <div className="confirmation__actions" style={{ marginTop: 20 }}>
-              <Link to="/" className="btn btn--primary">
-                Volver al inicio
-              </Link>
-              <Link to="/#carta" className="btn btn--outline-dark">
-                Seguir comprando
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const zonaSel = useMemo(
+    () => zonas.find((z) => z.distrito === direccion.distrito) || null,
+    [zonas, direccion.distrito],
+  );
+  const deliverySoles = zonaSel?.costoSoles ?? 0;
+  const subtotalNeto = Math.max(0, subtotal - descuentoSoles);
+  const total = subtotalNeto + deliverySoles;
+  const sedeNombre = sedes.find((s) => s.id === (sedeId || zonaSel?.sedeId))?.nombre || "";
 
-  const submit = async (e) => {
-    e.preventDefault();
-    setError("");
-    const tel = contactoTelefono.replace(/\D/g, "").slice(0, 9);
-    if (contactoNombre.trim().length < 3 || tel.length !== 9) {
-      setError("Nombre de contacto (mín. 3 caracteres) y celular de 9 dígitos son obligatorios.");
+  const onLocation = (loc) => {
+    setDireccion((prev) => ({
+      ...prev,
+      calle: loc.calle || prev.calle,
+      distrito: loc.cobertura && loc.distrito ? loc.distrito : prev.distrito,
+    }));
+    if (loc.cobertura && loc.sedeId) setSedeId(loc.sedeId);
+  };
+
+  const validarEntrega = () => {
+    if (direccion.calle.trim().length < 4) return "Indica tu dirección (calle y número).";
+    if (!direccion.distrito) return "Selecciona tu distrito de entrega.";
+    if (!zonaSel) return "Aún no llegamos a ese distrito. Elige Los Olivos, San Martín de Porres o Comas.";
+    if (direccion.referencia.trim().length < 3) return "Agrega una referencia para ubicarte.";
+    if (direccion.celularContacto.length !== 9) return "Indica un celular de contacto de 9 dígitos.";
+    return "";
+  };
+
+  const continuar = () => {
+    const e = validarEntrega();
+    if (e) {
+      setError(e);
       return;
     }
-    if (solicitaComprobante) {
-      const doc = docComprobante.replace(/\D/g, "");
-      const rz = razonComprobante.trim();
-      if (tipoComprobante === "factura") {
-        if (doc.length !== 11 || rz.length < 4) {
-          setError("Factura: RUC de 11 dígitos y razón social son obligatorios (requisito mínimo SUNAT).");
-          return;
-        }
-      } else if (doc.length !== 8 || rz.length < 4) {
-        setError("Boleta: DNI de 8 dígitos y nombre completo del titular son obligatorios.");
-        return;
-      }
+    setSedeId((prev) => prev || zonaSel?.sedeId || null);
+    setError("");
+    setStep(1);
+  };
+
+  const pagar = async () => {
+    setError("");
+    if (metodo === "card" && cardLast4.replace(/\D/g, "").length < 4) {
+      setError("Ingresa los últimos 4 dígitos de la tarjeta.");
+      return;
     }
-    if (method === "card") {
-      const digits = cardNumber.replace(/\D/g, "");
-      if (digits.length < 15 || !cardName.trim() || !cardExpiry.trim() || !String(cardCvv).trim()) {
-        setError("Completa número de tarjeta, titular, vencimiento y CVV para continuar.");
-        return;
-      }
-    }
-    if (delivery) {
-      const calleT = direccion.calle.trim();
-      const distT = direccion.distrito.trim();
-      if (calleT.length < 6 || distT.length < 3) {
-        setError("Para delivery completa calle y distrito (ubicación, mapa o texto) antes de pagar.");
-        return;
-      }
-    }
-    setSubmitting(true);
+    setEnviando(true);
     try {
       const payload = {
-        items: items.map((x) => ({ platoId: x.platoId, qty: x.qty })),
-        delivery,
-        direccion: delivery ? direccion : null,
-        paymentMethod: method,
-        cardLast4: method === "card" ? cardNumber.replace(/\D/g, "").slice(-4) : undefined,
-        contactoNombre: contactoNombre.trim(),
-        contactoTelefono: tel,
-        comprobante: solicitaComprobante
-          ? {
-              solicita: true,
-              tipo: tipoComprobante,
-              numeroDocumento: docComprobante.replace(/\D/g, ""),
-              razonSocial: razonComprobante.trim(),
-            }
-          : { solicita: false },
+        sedeId: sedeId || zonaSel?.sedeId || undefined,
+        items: items.map((it) =>
+          it.tipo === "combo"
+            ? { comboId: it.comboId, qty: it.qty }
+            : { platoId: it.platoId, qty: it.qty, notas: it.notas },
+        ),
+        direccion: { calle: direccion.calle.trim(), distrito: direccion.distrito },
+        referencia: direccion.referencia.trim(),
+        celularContacto: direccion.celularContacto,
+        paymentMethod: metodo,
+        cardLast4: metodo === "card" ? cardLast4.replace(/\D/g, "").slice(-4) : undefined,
       };
-      const json = await apiPost("/api/pedidos", payload, { auth: true });
-      clearCart();
-      setDone(json.data);
+      const res = await apiPost("/api/pedidos-delivery", payload, { auth: true });
+      clear();
+      navigate(`/pedido/${res.data.id}`, { state: { justCreated: true } });
     } catch (err) {
       setError(err?.message || "No se pudo registrar el pedido.");
     } finally {
-      setSubmitting(false);
+      setEnviando(false);
     }
   };
 
+  if (items.length === 0) {
+    return (
+      <div className="container container--narrow cart-page">
+        <div className="cart-empty card card--pad">
+          <div className="cart-empty__icon" aria-hidden>🐆</div>
+          <h1 className="section-title">No hay nada que pagar</h1>
+          <p className="section-lead">Agrega platos o combos a tu carrito para continuar.</p>
+          <Link to="/" className="btn btn--primary">Ver la carta</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const stickyCta = step === 0 ? continuar : pagar;
+  const stickyLabel = step === 0 ? "Continuar" : enviando ? "Enviando…" : `Pagar S/ ${total.toFixed(2)}`;
+
   return (
-    <div className="booking-page">
-      <div className="container container--wide">
-        <header className="booking-page__head booking__intro">
-          <p className="eyebrow">Pago y confirmación</p>
-          <h1 className="section-title">Checkout</h1>
-          <p className="section-lead">
-            {delivery
-              ? "Delivery activo: confirma o ajusta la dirección abajo, luego contacto y pago. Tiempo estimado de entrega ~1 h según tráfico y cocina."
-              : "Recojo en local: datos de contacto obligatorios. Si pides comprobante SUNAT, completa DNI + nombre (boleta) o RUC + razón social (factura). Luego elige método de pago."}
-          </p>
-        </header>
+    <div className="container container--narrow checkout-page checkout-page--with-sticky">
+      <header className="checkout-page__head">
+        <Link to="/carrito" className="btn btn--ghost btn--sm">← Carrito</Link>
+        <h1 className="section-title">Finalizar pedido</h1>
+      </header>
 
-        {delivery ? (
-          <div className="checkout-delivery card card--pad">
-            <h2 className="section-title" style={{ fontSize: "1.25rem", marginBottom: 8 }}>
-              Dirección de entrega
-            </h2>
-            <p className="hint" style={{ marginBottom: 14 }}>
-              Misma dirección que en el carrito: GPS, mapa con pin o texto. El reparto usa calle, distrito y referencia.
-            </p>
-            <DeliveryAddressEditor />
+      <div className="step-indicator" aria-label="Pasos">
+        {STEPS.map((s, i) => (
+          <div
+            key={s.id}
+            className={`step-indicator__item${step === i ? " step-indicator__item--active" : step > i ? " step-indicator__item--done" : ""}`}
+          >
+            <span className="step-indicator__num">{step > i ? "✓" : s.icon}</span>
+            <span className="step-indicator__label">{s.label}</span>
           </div>
-        ) : null}
+        ))}
+      </div>
 
+      {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
+
+      {step === 0 && (
         <div className="checkout-grid">
-          <div className="card card--pad">
-            <h2 className="section-title" style={{ fontSize: "1.25rem", marginBottom: 14 }}>
-              Tu orden
-            </h2>
-            <ul className="checkout-lines">
-              {items.map((x) => (
-                <li key={x.platoId}>
-                  <span>
-                    {x.qty}× {x.nombre}
-                  </span>
-                  <span>S/ {(x.precioSoles * x.qty).toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
-            <dl className="cart-summary__lines" style={{ marginTop: 16 }}>
-              <div>
-                <dt>Subtotal</dt>
-                <dd>S/ {subtotalSoles.toFixed(2)}</dd>
-              </div>
-              <div>
-                <dt>Delivery</dt>
-                <dd>S/ {deliverySoles.toFixed(2)}</dd>
-              </div>
-              <div className="cart-summary__total">
-                <dt>Total</dt>
-                <dd>S/ {totalSoles.toFixed(2)}</dd>
-              </div>
-            </dl>
+          <div className="checkout-col">
+            <h3 className="cuenta-step__title">¿Dónde lo entregamos?</h3>
+            <DeliveryMapPicker onLocation={onLocation} />
+            <DeliveryAddressEditor value={direccion} zonas={zonas} onChange={setDireccion} />
           </div>
-
-          <form className="card card--pad checkout-pay" onSubmit={submit}>
-            <h2 className="section-title" style={{ fontSize: "1.25rem", marginBottom: 12 }}>
-              Contacto del pedido
-            </h2>
-            <p className="hint" style={{ marginBottom: 14 }}>
-              Obligatorio para llamadas y coordinación (delivery o dudas del local).
-            </p>
-            <div className="booking__grid booking__grid--2" style={{ marginBottom: 20 }}>
-              <div className="field">
-                <label className="label">
-                  Nombre completo<span className="req">*</span>
-                </label>
-                <input
-                  className="input"
-                  value={contactoNombre}
-                  onChange={(e) => setContactoNombre(e.target.value)}
-                  autoComplete="name"
-                  maxLength={120}
-                />
+          <aside className="checkout-aside card card--pad">
+            <h4>Resumen</h4>
+            <div className="cart-summary__row"><span>Subtotal</span><strong>S/ {subtotal.toFixed(2)}</strong></div>
+            {descuentoSoles > 0 && (
+              <div className="cart-summary__row cart-summary__row--discount">
+                <span>{promo?.label || "Descuento"}</span>
+                <strong>− S/ {descuentoSoles.toFixed(2)}</strong>
               </div>
-              <div className="field">
-                <label className="label">
-                  Celular<span className="req">*</span>
-                </label>
-                <input
-                  className="input"
-                  inputMode="numeric"
-                  value={contactoTelefono}
-                  onChange={(e) => setContactoTelefono(e.target.value.replace(/\D/g, "").slice(0, 9))}
-                  autoComplete="tel-national"
-                  maxLength={9}
-                />
-              </div>
+            )}
+            <div className="cart-summary__row">
+              <span>Delivery {direccion.distrito ? `· ${direccion.distrito}` : ""}</span>
+              <strong>{zonaSel ? `S/ ${deliverySoles.toFixed(2)}` : "—"}</strong>
             </div>
-
-            <h2 className="section-title" style={{ fontSize: "1.25rem", marginBottom: 10 }}>
-              Comprobante de pago (SUNAT)
-            </h2>
-            <div className="checkbox-field" style={{ marginBottom: 12 }}>
-              <input
-                type="checkbox"
-                id="sol-comp"
-                checked={solicitaComprobante}
-                onChange={(e) => {
-                  setSolicitaComprobante(e.target.checked);
-                  setError("");
-                }}
-              />
-              <label htmlFor="sol-comp">
-                Solicito <strong>comprobante electrónico</strong> (boleta con DNI o factura con RUC). Si marcas esta
-                casilla, los datos del receptor son obligatorios.
-              </label>
+            {zonaSel && (
+              <p className="checkout-eta">⚡ Llegada estimada {zonaSel.minutosMin}–{zonaSel.minutosMax} min</p>
+            )}
+            {sedeNombre && <p className="hint">Sale de {sedeNombre}</p>}
+            <div className="cart-summary__row cart-summary__row--total">
+              <span>Total</span>
+              <strong>S/ {total.toFixed(2)}</strong>
             </div>
-            {solicitaComprobante ? (
-              <div className="checkout-comprobante" style={{ marginBottom: 20 }}>
-                <div className="pay-methods pay-methods--inline" role="radiogroup" aria-label="Tipo de comprobante">
-                  <button
-                    type="button"
-                    className={`pay-method ${tipoComprobante === "boleta" ? "pay-method--active" : ""}`}
-                    aria-pressed={tipoComprobante === "boleta"}
-                    onClick={() => {
-                      setTipoComprobante("boleta");
-                      setDocComprobante("");
-                      setError("");
-                    }}
-                  >
-                    <strong>Boleta</strong>
-                    <span>DNI (8 dígitos) + nombre completo</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`pay-method ${tipoComprobante === "factura" ? "pay-method--active" : ""}`}
-                    aria-pressed={tipoComprobante === "factura"}
-                    onClick={() => {
-                      setTipoComprobante("factura");
-                      setDocComprobante("");
-                      setError("");
-                    }}
-                  >
-                    <strong>Factura</strong>
-                    <span>RUC (11 dígitos) + razón social</span>
-                  </button>
-                </div>
-                <div className="booking__grid booking__grid--2" style={{ marginTop: 14 }}>
-                  <div className="field">
-                    <label className="label">{tipoComprobante === "factura" ? "RUC" : "DNI"}</label>
-                    <input
-                      className="input"
-                      inputMode="numeric"
-                      value={docComprobante}
-                      onChange={(e) =>
-                        setDocComprobante(
-                          e.target.value.replace(/\D/g, "").slice(0, tipoComprobante === "factura" ? 11 : 8),
-                        )
-                      }
-                      maxLength={tipoComprobante === "factura" ? 11 : 8}
-                    />
-                  </div>
-                  <div className="field" style={{ gridColumn: "1 / -1" }}>
-                    <label className="label">
-                      {tipoComprobante === "factura" ? "Razón social" : "Nombres y apellidos (titular)"}
-                    </label>
-                    <input
-                      className="input"
-                      value={razonComprobante}
-                      onChange={(e) => setRazonComprobante(e.target.value.slice(0, 200))}
-                      maxLength={200}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            <button type="button" className="btn btn--primary btn--block" onClick={continuar}>
+              Continuar al pago
+            </button>
+          </aside>
+        </div>
+      )}
 
-            <h2 className="section-title" style={{ fontSize: "1.25rem", marginBottom: 16 }}>
-              Método de pago
-            </h2>
-            <div className="pay-methods" role="tablist" aria-label="Método de pago">
-              {METHODS.map((m) => (
+      {step === 1 && (
+        <div className="checkout-grid">
+          <div className="checkout-col">
+            <h3 className="cuenta-step__title">Método de pago</h3>
+            <div className="pago-metodos">
+              {METODOS.map((m) => (
                 <button
                   key={m.id}
                   type="button"
-                  role="tab"
-                  aria-selected={method === m.id}
-                  className={`pay-method ${method === m.id ? "pay-method--active" : ""}`}
-                  onClick={() => {
-                    setMethod(m.id);
-                    setError("");
-                  }}
+                  className={`pago-metodo-btn${metodo === m.id ? " pago-metodo-btn--active" : ""}`}
+                  onClick={() => setMetodo(m.id)}
                 >
-                  <strong>{m.title}</strong>
-                  <span>{m.desc}</span>
+                  <span className="pago-metodo-btn__icon">{m.icon}</span>
+                  <span>{m.label}</span>
                 </button>
               ))}
             </div>
 
-            {method === "card" ? (
-              <div className="booking__grid booking__grid--2" style={{ marginTop: 18 }}>
-                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                  <label className="label">Titular de la tarjeta</label>
-                  <input className="input" value={cardName} onChange={(e) => setCardName(e.target.value)} autoComplete="cc-name" />
-                </div>
-                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                  <label className="label">Número de tarjeta</label>
-                  <input
-                    className="input"
-                    inputMode="numeric"
-                    placeholder="Número de tarjeta"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value.replace(/[^\d\s]/g, "").slice(0, 19))}
-                    autoComplete="cc-number"
-                  />
-                </div>
-                <div className="field">
-                  <label className="label">Vencimiento</label>
-                  <input className="input" placeholder="MM/AA" value={cardExpiry} onChange={(e) => setCardExpiry(e.target.value)} autoComplete="cc-exp" />
-                </div>
-                <div className="field">
-                  <label className="label">CVV</label>
-                  <input className="input" type="password" maxLength={4} value={cardCvv} onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, ""))} autoComplete="cc-csc" />
-                </div>
-                <p className="notice notice--spaced" style={{ gridColumn: "1 / -1" }}>
-                  El cargo se registra en este entorno de piloto según la configuración del local. En producción, los
-                  datos de tarjeta se tokenizan en la pasarela certificada (PCI DSS); no se almacenan en texto plano.
-                </p>
+            {metodo === "card" && (
+              <div className="field" style={{ marginTop: 16 }}>
+                <label className="label">Últimos 4 dígitos de la tarjeta<span className="req">*</span></label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="4521"
+                  value={cardLast4}
+                  onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  inputMode="numeric"
+                  maxLength={4}
+                />
+                <p className="hint">Pago seguro simulado para tu pedido Guepardo.</p>
               </div>
-            ) : null}
+            )}
 
-            {method === "qr" ? (
-              <p className="notice notice--spaced" style={{ marginTop: 16 }}>
-                Tras confirmar verás el <strong>código de operación</strong> y el <strong>código QR</strong> para pagar
-                con Yape o Plin.
-              </p>
-            ) : null}
+            {metodo === "qr" && (
+              <div className="pago-qr-preview">
+                <QRCodeSVG value={`PE|TRES_REGIONES|CHECKOUT|${total.toFixed(2)}|PEN|YAPE_PLIN`} size={180} level="M" includeMargin />
+                <p className="hint" style={{ textAlign: "center", marginTop: 8 }}>Escanea con Yape o Plin · S/ {total.toFixed(2)}</p>
+              </div>
+            )}
 
-            {method === "cash" ? (
-              <p className="notice notice--spaced" style={{ marginTop: 16 }}>
-                El pedido queda <strong>pendiente de cobro en caja o al rider</strong>. El administrador marca “cobrado”
-                en el panel de pedidos.
-              </p>
-            ) : null}
+            {metodo === "cash" && (
+              <div className="pago-cash-msg">
+                <p>Pagas en efectivo al recibir tu pedido. Ten el monto exacto si es posible.</p>
+              </div>
+            )}
 
-            {error ? <div className="error" style={{ marginTop: 14 }}>{error}</div> : null}
-
-            <div className="checkout-actions">
-              <button type="submit" className="btn btn--primary" disabled={submitting}>
-                {submitting ? "Procesando…" : "Confirmar pago"}
+            <div className="cuenta-step__actions" style={{ marginTop: 20 }}>
+              <button type="button" className="btn btn--outline-dark" onClick={() => { setStep(0); setError(""); }}>
+                Atrás
               </button>
-              <button type="button" className="btn btn--surface" onClick={() => navigate("/carrito")}>
-                Volver al carrito
+              <button type="button" className="btn btn--primary" onClick={pagar} disabled={enviando}>
+                {enviando ? "Enviando…" : `Pagar S/ ${total.toFixed(2)}`}
               </button>
             </div>
-          </form>
+          </div>
+          <aside className="checkout-aside card card--pad">
+            <h4>Entrega</h4>
+            <p className="hint">{direccion.calle}, {direccion.distrito}</p>
+            <p className="hint">Ref: {direccion.referencia}</p>
+            <p className="hint">Contacto: {direccion.celularContacto}</p>
+            {descuentoSoles > 0 && (
+              <div className="cart-summary__row cart-summary__row--discount">
+                <span>Descuento</span>
+                <strong>− S/ {descuentoSoles.toFixed(2)}</strong>
+              </div>
+            )}
+            <div className="cart-summary__row cart-summary__row--total" style={{ marginTop: 12 }}>
+              <span>Total</span>
+              <strong>S/ {total.toFixed(2)}</strong>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <div className="checkout-sticky" aria-label="Acción de pago">
+        <div className="checkout-sticky__inner">
+          <div>
+            <span className="checkout-sticky__label">{STEPS[step].label}</span>
+            <strong className="checkout-sticky__total">S/ {total.toFixed(2)}</strong>
+          </div>
+          <button
+            type="button"
+            className="btn btn--sun"
+            onClick={stickyCta}
+            disabled={enviando && step === 1}
+          >
+            {stickyLabel}
+          </button>
         </div>
       </div>
     </div>

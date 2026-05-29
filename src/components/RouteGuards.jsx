@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
-import { haySesionAdmin, haySesionCliente } from "../session";
+import { haySesionAdmin, haySesionCliente, haySesionCocina, haySesionMozoOrAdmin } from "../session";
 
 export function RequireClientAuth({ children }) {
   const location = useLocation();
@@ -11,5 +11,15 @@ export function RequireClientAuth({ children }) {
 
 export function RequireAdminAuth({ children }) {
   if (!haySesionAdmin()) return <Navigate to="/admin/login" replace />;
+  return children;
+}
+
+export function RequireMozoAuth({ children }) {
+  if (!haySesionMozoOrAdmin()) return <Navigate to="/mozo/login" replace />;
+  return children;
+}
+
+export function RequireCocinaAuth({ children }) {
+  if (!haySesionCocina() && !haySesionMozoOrAdmin()) return <Navigate to="/cocina/login" replace />;
   return children;
 }

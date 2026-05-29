@@ -5,6 +5,7 @@ import SalonFloorPlan from "../../components/SalonFloorPlan";
 import StepFlow from "../../components/StepFlow";
 import { mesasDisponibles, mesasOcupadas, TURNOS, ZONAS } from "../../data/salon";
 import { useReservations } from "../../context/ReservationsContext";
+import { obtenerSesion } from "../../session";
 
 const STEPS = ["Turno", "Mesa", "Detalle", "Confirmación"];
 
@@ -15,10 +16,11 @@ function getToday() {
 export default function ReservarMesa() {
   const navigate = useNavigate();
   const { reservas, createReservation, ready } = useReservations();
+  const sesion = obtenerSesion();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
-    cliente: "",
-    telefono: "",
+    cliente: sesion?.nombreCompleto || sesion?.nombre || "",
+    telefono: sesion?.telefono || "",
     fecha: getToday(),
     hora: "19:00",
     personas: 2,
@@ -136,11 +138,11 @@ export default function ReservarMesa() {
       <div className="container container--wide">
         <div className="booking">
           <div className="booking-page__head booking__intro">
-          <p className="eyebrow">Reserva en sala</p>
-          <h1 className="section-title">Tu mesa en TRES REGIONES</h1>
+          <p className="eyebrow">Reserva tu mesa</p>
+          <h1 className="section-title section-title--gradient">Vive Tres Regiones en sala</h1>
           <p className="section-lead">
-            Flujo profesional para turismo presencial en Lima: turno, mapa de sala y confirmación con política clara.
-            Datos ampliados e integraciones en la versión comercial.
+            Elige tu turno, escoge tu mesa en el plano del salón y confirma tu separación. Te recibimos con la misma
+            rapidez que nuestro delivery.
           </p>
         </div>
 
@@ -157,7 +159,7 @@ export default function ReservarMesa() {
             <p>Indica cuándo llegas, cuántos comensales son y en qué ambiente prefieres sentarte.</p>
             <div className="booking__grid booking__grid--2">
               <div className="field">
-                <label className="label">Nombre del visitante<span className="req">*</span></label>
+                <label className="label">Nombre completo<span className="req">*</span></label>
                 <input className="input" value={form.cliente} onChange={(e) => handleChange("cliente", e.target.value)} disabled={!ready} maxLength={80} />
               </div>
               <div className="field">

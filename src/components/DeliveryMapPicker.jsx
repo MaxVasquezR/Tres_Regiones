@@ -1,75 +1,110 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { apiGet } from "../api";
 
-const LIMA_DEFAULT = [-12.091, -77.035];
+const LIMA_NORTE = { lat: -11.9756, lng: -77.0719 };
 
-export default function DeliveryMapPicker({ lat, lng, onPositionChange }) {
-  const wrapRef = useRef(null);
+const markerIcon = L.divIcon({
+  className: "delivery-map-pin",
+  html: "<span>📍</span>",
+  iconSize: [32, 32],
+  iconAnchor: [16, 30],
+});
+
+export default function DeliveryMapPicker({ onLocation }) {
+  const mapEl = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
-  const onPosRef = useRef(onPositionChange);
-  onPosRef.current = onPositionChange;
+  const [resolving, setResolving] = useState(false);
+  const [hint, setHint] = useState("");
+
+  const resolver = async (lat, lng) => {
+    setResolving(true);
+    setHint("Ubicando tu dirección…");
+    try {
+      const res = await apiGet(`/api/geo/reverse?lat=${lat}&lng=${lng}`);
+      const data = res.data || {};
+      onLocation?.({ lat, lng, ...data });
+      setHint(
+        data.cobertura
+          ? `Entrega disponible en ${data.distrito} ⚡`
+          : `Aún no llegamos a ${data.distrito || "esa zona"}. Elige tu distrito manualmente.`,
+      );
+    } catch {
+      setHint("No pudimos ubicar la dirección. Elige tu distrito manualmente.");
+      onLocation?.({ lat, lng, cobertura: false });
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const moverMarcador = (lat, lng, recenter = false) => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (markerRef.current) {
+      markerRef.current.setLatLng([lat, lng]);
+    } else {
+      markerRef.current = L.marker([lat, lng], { icon: markerIcon, draggable: true }).addTo(map);
+      markerRef.current.on("dragend", (e) => {
+        const { lat: dlat, lng: dlng } = e.target.getLatLng();
+        void resolver(dlat, dlng);
+      });
+    }
+    if (recenter) map.setView([lat, lng], 16);
+  };
 
   useEffect(() => {
-    const el = wrapRef.current;
-    if (!el) return undefined;
-
-    const la0 = Number(lat);
-    const lo0 = Number(lng);
-    const center = Number.isFinite(la0) && Number.isFinite(lo0) ? [la0, lo0] : [...LIMA_DEFAULT];
-
-    const map = L.map(el, { zoomControl: true, scrollWheelZoom: true }).setView(center, 16);
-    mapRef.current = map;
-
+    if (mapRef.current || !mapEl.current) return;
+    const map = L.map(mapEl.current, { zoomControl: true }).setView([LIMA_NORTE.lat, LIMA_NORTE.lng], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap",
     }).addTo(map);
-
-    const icon = L.divIcon({
-      className: "",
-      html: '<div class="delivery-map-pin" aria-hidden="true"></div>',
-      iconSize: [34, 42],
-      iconAnchor: [17, 40],
-    });
-
-    const mk = L.marker(center, { draggable: true, icon }).addTo(map);
-    markerRef.current = mk;
-
-    const emit = () => {
-      const p = mk.getLatLng();
-      onPosRef.current(p.lat, p.lng);
-    };
-    mk.on("dragend", emit);
     map.on("click", (e) => {
-      mk.setLatLng(e.latlng);
-      emit();
+      moverMarcador(e.latlng.lat, e.latlng.lng);
+      void resolver(e.latlng.lat, e.latlng.lng);
     });
-
-    const t = window.setTimeout(() => map.invalidateSize(), 160);
-
+    mapRef.current = map;
     return () => {
-      window.clearTimeout(t);
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mapa se inicializa una vez al montar
+    // Inicializa el mapa una sola vez; los handlers usan refs estables.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    const mk = markerRef.current;
-    if (!map || !mk) return;
-    const la = Number(lat);
-    const lo = Number(lng);
-    if (!Number.isFinite(la) || !Number.isFinite(lo)) return;
-    const cur = mk.getLatLng();
-    if (Math.abs(cur.lat - la) < 1e-6 && Math.abs(cur.lng - lo) < 1e-6) return;
-    mk.setLatLng([la, lo]);
-    map.setView([la, lo], Math.max(map.getZoom(), 15), { animate: false });
-  }, [lat, lng]);
+  const usarMiUbicacion = () => {
+    if (!navigator.geolocation) {
+      setHint("Tu navegador no permite geolocalización. Elige tu distrito manualmente.");
+      return;
+    }
+    setResolving(true);
+    setHint("Obteniendo tu ubicación…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        moverMarcador(latitude, longitude, true);
+        void resolver(latitude, longitude);
+      },
+      () => {
+        setResolving(false);
+        setHint("No autorizaste la ubicación. Marca el punto en el mapa o elige tu distrito.");
+      },
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  };
 
-  return <div ref={wrapRef} className="delivery-map-picker" />;
+  return (
+    <div className="delivery-map-picker">
+      <div className="delivery-map-picker__map" ref={mapEl} aria-label="Mapa de ubicación de entrega" />
+      <div className="delivery-map-picker__bar">
+        <button type="button" className="btn btn--surface btn--sm" onClick={usarMiUbicacion} disabled={resolving}>
+          {resolving ? "Ubicando…" : "📍 Usar mi ubicación"}
+        </button>
+        {hint && <span className="delivery-map-picker__hint">{hint}</span>}
+      </div>
+    </div>
+  );
 }

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiDelete, apiGet, apiPatch } from "../../api";
+import { apiGet, apiPatch } from "../../api";
 import { useReservations } from "../../context/ReservationsContext";
-import { labelPedidoEstado, PEDIDO_ESTADOS, pedidoBadgeClass } from "../../data/adminPedidoEstados";
+import { labelPedidoEstado, pedidoBadgeClass } from "../../data/adminPedidoEstados";
+import { getAdminSede, subscribeAdminSede } from "../../data/adminSede";
 
 function estadoReservaClass(estado) {
   if (estado === "Confirmada") return "badge badge--ok";
@@ -10,72 +11,73 @@ function estadoReservaClass(estado) {
   return "badge badge--warn";
 }
 
+const FLUJO_DELIVERY = ["Recibido", "En_cocina", "Listo", "En_camino", "Entregado"];
+
+function siguienteEstado(estado) {
+  const i = FLUJO_DELIVERY.indexOf(estado);
+  return i >= 0 && i < FLUJO_DELIVERY.length - 1 ? FLUJO_DELIVERY[i + 1] : null;
+}
+
 export default function CentroOperaciones() {
   const { reservas, ready, refresh, updateReservationStatus, deleteReservation } = useReservations();
+  const [mesas, setMesas] = useState([]);
   const [pedidos, setPedidos] = useState([]);
-  const [loadingPed, setLoadingPed] = useState(true);
   const [msg, setMsg] = useState("");
-  const [busyPedido, setBusyPedido] = useState(null);
   const [busyReserva, setBusyReserva] = useState(null);
+  const [busyDelivery, setBusyDelivery] = useState(null);
+  const [sede, setSede] = useState(getAdminSede());
 
-  const cargarPedidos = useCallback(async () => {
-    setLoadingPed(true);
+  useEffect(() => subscribeAdminSede(setSede), []);
+
+  const cargar = useCallback(async () => {
     try {
-      const json = await apiGet("/api/pedidos", { auth: true });
-      setPedidos(Array.isArray(json.data) ? json.data : []);
+      const q = sede ? `?sedeId=${sede}` : "";
+      const [m, p] = await Promise.all([
+        apiGet("/api/mesas-estado", { auth: true }).catch(() => ({ data: [] })),
+        apiGet(`/api/pedidos${q}`, { auth: true }),
+      ]);
+      setMesas(m.data || []);
+      setPedidos(p.data || []);
     } catch (e) {
-      setMsg(e?.message || "No se pudieron cargar pedidos.");
-      setPedidos([]);
-    } finally {
-      setLoadingPed(false);
+      setMsg(e?.message || "Error al cargar operación.");
     }
-  }, []);
+  }, [sede]);
 
   useEffect(() => {
-    void cargarPedidos();
-  }, [cargarPedidos]);
+    void cargar();
+    const id = setInterval(() => void cargar(), 30000);
+    return () => clearInterval(id);
+  }, [cargar]);
 
-  const pedidosOrden = useMemo(() => {
-    return [...pedidos].sort((a, b) => Number(b.id) - Number(a.id)).slice(0, 25);
-  }, [pedidos]);
+  const deliveriesActivos = useMemo(
+    () =>
+      pedidos
+        .filter((p) => p.tipo === "delivery" && !["Entregado", "Anulado"].includes(p.estado))
+        .sort((a, b) => (a.creadoEn > b.creadoEn ? 1 : -1)),
+    [pedidos],
+  );
+
+  const avanzarDelivery = async (p, estado) => {
+    setBusyDelivery(p.id);
+    setMsg("");
+    try {
+      await apiPatch(`/api/pedidos-delivery/${p.id}`, { estado }, { auth: true });
+      await cargar();
+    } catch (e) {
+      setMsg(e?.message || "No se pudo actualizar el delivery.");
+    } finally {
+      setBusyDelivery(null);
+    }
+  };
 
   const reservasActivas = useMemo(() => {
     return [...reservas]
       .filter((r) => !["Cancelada"].includes(r.estado))
-      .sort((a, b) => {
-        const fa = `${a.fecha}T${a.hora}:00`;
-        const fb = `${b.fecha}T${b.hora}:00`;
-        return fa.localeCompare(fb);
-      })
+      .sort((a, b) => `${a.fecha}T${a.hora}`.localeCompare(`${b.fecha}T${b.hora}`))
       .slice(0, 20);
   }, [reservas]);
 
-  const setEstadoPedido = async (id, estado) => {
-    setMsg("");
-    setBusyPedido(id);
-    try {
-      await apiPatch(`/api/pedidos/${id}`, { estado }, { auth: true });
-      await cargarPedidos();
-    } catch (e) {
-      setMsg(e?.message || "No se pudo actualizar el pedido.");
-    } finally {
-      setBusyPedido(null);
-    }
-  };
-
-  const eliminarPedido = async (id) => {
-    if (!window.confirm("¿Eliminar este pedido del sistema? No se puede deshacer.")) return;
-    setMsg("");
-    setBusyPedido(id);
-    try {
-      await apiDelete(`/api/pedidos/${id}`, { auth: true });
-      await cargarPedidos();
-    } catch (e) {
-      setMsg(e?.message || "No se pudo eliminar.");
-    } finally {
-      setBusyPedido(null);
-    }
-  };
+  const mesasActivas = mesas.filter((m) => ["Ocupada", "Cuenta_pedida"].includes(m.estado));
 
   const setEstadoReserva = async (id, estado) => {
     setMsg("");
@@ -92,7 +94,6 @@ export default function CentroOperaciones() {
 
   const borrarReserva = async (id) => {
     if (!window.confirm("¿Eliminar esta reserva?")) return;
-    setMsg("");
     setBusyReserva(id);
     try {
       await deleteReservation(id);
@@ -106,236 +107,204 @@ export default function CentroOperaciones() {
 
   return (
     <div className="admin-centro-ops">
-      <header className="admin-centro-ops__head">
+      <header className="admin-page-head">
         <div>
           <p className="eyebrow">Operación en vivo</p>
-          <h1 style={{ margin: "0 0 8px", color: "var(--brand-700)" }}>Centro de operación</h1>
-          <p style={{ margin: 0, color: "var(--muted)", maxWidth: 720 }}>
-            Pedidos web (delivery y recojo) y reservas de sala en una sola vista. Un clic por acción; el detalle sigue
-            en <Link to="/admin/pedidos">Pedidos web</Link> y <Link to="/admin/reservas">Reservas</Link>.
+          <h1>Centro de operación</h1>
+          <p className="admin-page-head__lead">
+            Estado del salón y reservas en una sola vista. Ventas detalladas en{" "}
+            <Link to="/admin/ventas">Ventas sala</Link>.
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button type="button" className="btn btn--surface" onClick={() => void cargarPedidos()} disabled={loadingPed}>
-            Actualizar pedidos
-          </button>
-          <button type="button" className="btn btn--surface" onClick={() => void refresh()} disabled={!ready}>
-            Actualizar reservas
-          </button>
-        </div>
+        <button type="button" className="btn btn--surface" onClick={() => void cargar()}>
+          Actualizar
+        </button>
       </header>
 
-      {msg ? (
-        <div className="error" style={{ marginBottom: 14 }}>
-          {msg}
-        </div>
-      ) : null}
+      {msg && <p className="error">{msg}</p>}
 
       <div className="admin-centro-ops__grid">
-        <section className="card card--pad admin-centro-ops__panel">
-          <h2 className="section-title" style={{ fontSize: "1.2rem", marginBottom: 12 }}>
-            Pedidos
-          </h2>
-          {loadingPed ? <p className="loading-inline">Cargando…</p> : null}
-          {!loadingPed && !pedidosOrden.length ? (
-            <p style={{ color: "var(--muted)", margin: 0 }}>Sin pedidos.</p>
-          ) : null}
-          <div className="table-wrap" style={{ marginTop: 8 }}>
-            <table className="admin-centro-ops__table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Cliente</th>
-                  <th>Tipo</th>
-                  <th>Total</th>
-                  <th>Estado</th>
-                  <th>Acciones rápidas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidosOrden.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.id}</td>
-                    <td>
-                      <strong>{p.clienteNombre}</strong>
-                      <div style={{ fontSize: 12, color: "var(--muted)" }}>{p.contactoTelefono}</div>
-                    </td>
-                    <td>{p.delivery ? "Delivery" : "Recojo"}</td>
-                    <td>S/ {Number(p.totalSoles).toFixed(2)}</td>
-                    <td>
-                      <span className={pedidoBadgeClass(p.estado)} style={{ fontSize: 11 }}>
-                        {labelPedidoEstado(p.estado)}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="admin-centro-ops__actions">
-                        <select
-                          className="input admin-centro-ops__select"
-                          value={p.estado}
-                          disabled={busyPedido === p.id}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (v !== p.estado) void setEstadoPedido(p.id, v);
-                          }}
-                        >
-                          {!PEDIDO_ESTADOS.some((x) => x.value === p.estado) ? (
-                            <option value={p.estado}>{p.estado}</option>
-                          ) : null}
-                          {PEDIDO_ESTADOS.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="admin-centro-ops__quick">
-                          <button
-                            type="button"
-                            className="btn btn--surface btn--sm"
-                            disabled={busyPedido === p.id}
-                            onClick={() => void setEstadoPedido(p.id, "Confirmado_cocina")}
-                          >
-                            Cocina
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--surface btn--sm"
-                            disabled={busyPedido === p.id}
-                            onClick={() => void setEstadoPedido(p.id, p.delivery ? "En_reparto" : "Listo_recojo")}
-                          >
-                            {p.delivery ? "Ruta" : "Listo"}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--surface btn--sm"
-                            disabled={busyPedido === p.id}
-                            onClick={() => void setEstadoPedido(p.id, "Entregado")}
-                          >
-                            Entregado
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--surface btn--sm"
-                            disabled={busyPedido === p.id}
-                            onClick={() => void setEstadoPedido(p.id, "Cerrado")}
-                          >
-                            Cerrar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--surface btn--sm"
-                            style={{ color: "#b71c1c" }}
-                            disabled={busyPedido === p.id}
-                            onClick={() => void setEstadoPedido(p.id, "Anulado")}
-                          >
-                            Anular
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn--surface btn--sm"
-                            disabled={busyPedido === p.id}
-                            onClick={() => void eliminarPedido(p.id)}
-                          >
-                            Borrar
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <section className="card card--pad">
+          <h2 className="section-title" style={{ fontSize: "1.1rem" }}>Salón ahora</h2>
+          <div className="kpi-grid kpi-grid--compact" style={{ marginBottom: 16 }}>
+            <article className="kpi-card kpi-card--ops">
+              <p>Ocupadas</p>
+              <strong>{mesasActivas.length}</strong>
+            </article>
+            <article className="kpi-card kpi-card--ops">
+              <p>Libres</p>
+              <strong>{mesas.filter((m) => m.estado === "Libre").length}</strong>
+            </article>
+            <article className="kpi-card kpi-card--ops">
+              <p>Reservadas hoy</p>
+              <strong>{mesas.filter((m) => m.estado === "Reservada").length}</strong>
+            </article>
           </div>
+          {mesasActivas.length === 0 ? (
+            <p className="muted">No hay mesas ocupadas en este momento.</p>
+          ) : (
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <thead>
+                  <tr>
+                    <th>Mesa</th>
+                    <th>Estado</th>
+                    <th>Mozo</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mesasActivas.map((m) => (
+                    <tr key={m.codigo}>
+                      <td><strong>{m.codigo}</strong></td>
+                      <td><span className="badge badge--warn">{m.estado.replace("_", " ")}</span></td>
+                      <td>{m.mozoNombre || "—"}</td>
+                      <td>{m.totalAbierto ? `S/ ${m.totalAbierto.toFixed(2)}` : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <Link to="/mozo/mesas" className="btn btn--outline-dark" style={{ marginTop: 12 }}>
+            Abrir pantalla mozo
+          </Link>
         </section>
 
-        <section className="card card--pad admin-centro-ops__panel">
-          <h2 className="section-title" style={{ fontSize: "1.2rem", marginBottom: 12 }}>
-            Reservas (activas)
-          </h2>
-          {!ready ? <p className="loading-inline">Cargando…</p> : null}
-          {ready && !reservasActivas.length ? <p style={{ color: "var(--muted)", margin: 0 }}>Sin reservas activas.</p> : null}
-          <div className="table-wrap" style={{ marginTop: 8 }}>
-            <table className="admin-centro-ops__table">
+        <section className="card card--pad">
+          <h2 className="section-title" style={{ fontSize: "1.1rem" }}>Reservas próximas</h2>
+          {!ready ? (
+            <p className="muted">Cargando reservas…</p>
+          ) : reservasActivas.length === 0 ? (
+            <p className="muted">Sin reservas activas.</p>
+          ) : (
+            <div className="ops-table-wrap">
+              <table className="ops-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Hora</th>
+                    <th>Cliente</th>
+                    <th>Mesa</th>
+                    <th>Estado</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reservasActivas.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.fecha}</td>
+                      <td>{r.hora}</td>
+                      <td>{r.cliente}</td>
+                      <td>{r.mesa}</td>
+                      <td><span className={estadoReservaClass(r.estado)}>{r.estado}</span></td>
+                      <td className="ops-table__actions">
+                        {r.estado === "Pendiente" && (
+                          <button type="button" className="btn btn--ghost btn--sm" disabled={busyReserva === r.id} onClick={() => void setEstadoReserva(r.id, "Confirmada")}>
+                            Confirmar
+                          </button>
+                        )}
+                        <button type="button" className="btn btn--ghost btn--sm" disabled={busyReserva === r.id} onClick={() => void borrarReserva(r.id)}>
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className="card card--pad" style={{ marginTop: 20 }}>
+        <h2 className="section-title" style={{ fontSize: "1.1rem" }}>
+          🐆 Delivery en curso {sede ? "" : "· todas las sedes"}
+        </h2>
+        {deliveriesActivos.length === 0 ? (
+          <p className="muted">No hay pedidos de delivery activos.</p>
+        ) : (
+          <div className="ops-table-wrap">
+            <table className="ops-table">
               <thead>
                 <tr>
-                  <th>ID</th>
+                  <th>Código</th>
                   <th>Cliente</th>
-                  <th>Fecha</th>
-                  <th>Mesa</th>
+                  <th>Distrito</th>
+                  <th>Total</th>
                   <th>Estado</th>
-                  <th>Acciones</th>
+                  <th>ETA</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
-                {reservasActivas.map((r) => (
-                  <tr key={r.id}>
-                    <td>{String(r.id).slice(-4)}</td>
-                    <td>
-                      <strong>{r.cliente}</strong>
-                      <div style={{ fontSize: 12, color: "var(--muted)" }}>{r.telefono}</div>
-                    </td>
-                    <td>
-                      {r.fecha} {r.hora}
-                    </td>
-                    <td>
-                      {r.mesa} · {r.zona}
-                    </td>
-                    <td>
-                      <span className={estadoReservaClass(r.estado)} style={{ fontSize: 11 }}>
-                        {r.estado}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="admin-centro-ops__quick">
+                {deliveriesActivos.map((p) => {
+                  const next = siguienteEstado(p.estado);
+                  return (
+                    <tr key={p.id}>
+                      <td><strong>{p.codigoPago}</strong></td>
+                      <td>{p.clienteNombre}<br /><span className="ops-table__muted">{p.celularContacto}</span></td>
+                      <td>{p.direccion?.distrito}</td>
+                      <td>S/ {(Number(p.totalSoles) || 0).toFixed(2)}</td>
+                      <td><span className="badge badge--info">{String(p.estado).replace(/_/g, " ")}</span></td>
+                      <td className="ops-table__muted">{p.etaTexto}</td>
+                      <td className="ops-table__actions">
+                        {next && (
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            disabled={busyDelivery === p.id}
+                            onClick={() => void avanzarDelivery(p, next)}
+                          >
+                            → {next.replace(/_/g, " ")}
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className="btn btn--surface btn--sm"
-                          disabled={busyReserva === r.id}
-                          onClick={() => void setEstadoReserva(r.id, "Confirmada")}
+                          className="btn btn--ghost btn--sm"
+                          disabled={busyDelivery === p.id}
+                          onClick={() => void avanzarDelivery(p, "Anulado")}
                         >
-                          Confirmar
+                          Anular
                         </button>
-                        <button
-                          type="button"
-                          className="btn btn--surface btn--sm"
-                          disabled={busyReserva === r.id}
-                          onClick={() => void setEstadoReserva(r.id, "Atendida")}
-                        >
-                          Atendida
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--surface btn--sm"
-                          disabled={busyReserva === r.id}
-                          onClick={() => void setEstadoReserva(r.id, "No show")}
-                        >
-                          No show
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--surface btn--sm"
-                          disabled={busyReserva === r.id}
-                          onClick={() => void setEstadoReserva(r.id, "Cancelada")}
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--surface btn--sm"
-                          style={{ color: "#b71c1c" }}
-                          disabled={busyReserva === r.id}
-                          onClick={() => void borrarReserva(r.id)}
-                        >
-                          Borrar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {pedidos.filter((p) => p.tipo === "mesa" && p.estado === "Pagado").slice(0, 5).length > 0 && (
+        <section className="card card--pad" style={{ marginTop: 20 }}>
+          <h2 className="section-title" style={{ fontSize: "1.1rem" }}>Últimas cuentas cobradas</h2>
+          <div className="ops-table-wrap">
+            <table className="ops-table">
+              <thead>
+                <tr>
+                  <th>Mesa</th>
+                  <th>Total</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pedidos
+                  .filter((p) => p.estado === "Pagado")
+                  .slice(0, 8)
+                  .map((p) => (
+                    <tr key={p.id}>
+                      <td>{p.mesaCodigo}</td>
+                      <td>S/ {(p.totalSoles || 0).toFixed(2)}</td>
+                      <td><span className={pedidoBadgeClass(p.estado)}>{labelPedidoEstado(p.estado)}</span></td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
         </section>
-      </div>
+      )}
     </div>
   );
 }

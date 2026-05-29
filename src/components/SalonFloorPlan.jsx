@@ -1,6 +1,20 @@
 import { useState } from "react";
 import { MESAS, PLANO_MESAS_POR_ZONA, ZONAS } from "../data/salon";
 
+const ESTADO_COLOR = {
+  Libre: "#4caf50",
+  Ocupada: "#e53935",
+  Cuenta_pedida: "#f59e0b",
+  Reservada: "#2196f3",
+};
+
+const ESTADO_LABEL = {
+  Libre: "Libre",
+  Ocupada: "Ocupada",
+  Cuenta_pedida: "Cuenta",
+  Reservada: "Reservada",
+};
+
 function mesaMeta(codigo) {
   return MESAS.find((m) => m.codigo === codigo);
 }
@@ -11,12 +25,103 @@ export default function SalonFloorPlan({
   titulo = "Tu lugar en el local",
   subtitulo = "Plano orientativo del salón y la terraza. La mesa resaltada es la que quedó separada con tu depósito.",
   variant = "showcase",
+  // POS props
+  mesasStatus = null,
+  onSelectMesa = null,
 }) {
   const meta = mesaDestacada ? mesaMeta(mesaDestacada) : null;
   const initialZona = zonaDefault && ZONAS.includes(zonaDefault) ? zonaDefault : ZONAS[0];
   const [zonaActiva, setZonaActiva] = useState(initialZona);
 
+  const isPOS = variant === "pos" && mesasStatus !== null;
+
   const posiciones = PLANO_MESAS_POR_ZONA[zonaActiva] || [];
+
+  if (isPOS) {
+    return (
+      <div className="floor-plan floor-plan--pos">
+        <div className="floor-plan__tabs" role="tablist" aria-label="Ambientes">
+          {ZONAS.map((z) => (
+            <button
+              key={z}
+              type="button"
+              role="tab"
+              aria-selected={zonaActiva === z}
+              className={`floor-plan__tab${zonaActiva === z ? " floor-plan__tab--active" : ""}`}
+              onClick={() => setZonaActiva(z)}
+            >
+              {z === "Salón principal" ? "Salón" : z}
+            </button>
+          ))}
+          <div className="floor-plan__pos-legend">
+            {Object.entries(ESTADO_LABEL).map(([k, v]) => (
+              <span key={k} className="floor-plan__pos-legend-item">
+                <i style={{ background: ESTADO_COLOR[k] }} className="floor-plan__pos-dot" aria-hidden />
+                {v}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="floor-plan__canvas-wrap floor-plan__canvas-wrap--pos">
+          <svg
+            className="floor-plan__svg"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="xMidYMid meet"
+            aria-label={`Plano POS de ${zonaActiva}`}
+          >
+            <defs>
+              <linearGradient id="pos-floor" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#f6f1e8" />
+                <stop offset="100%" stopColor="#e8ece9" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="100" height="100" fill="#1e2a32" />
+            <rect x="3" y="6" width="94" height="91" rx="3" fill="url(#pos-floor)" opacity="0.15" />
+            {(PLANO_MESAS_POR_ZONA[zonaActiva] || []).map((slot) => {
+              const m = mesaMeta(slot.codigo);
+              const mesaInfo = mesasStatus?.find?.((x) => x.codigo === slot.codigo);
+              const estado = mesaInfo?.estado || "Libre";
+              const color = ESTADO_COLOR[estado] || ESTADO_COLOR.Libre;
+              const isClickable = !!onSelectMesa;
+              const { x, y, w, h } = slot;
+              const totalStr = mesaInfo?.totalAbierto ? `S/ ${mesaInfo.totalAbierto.toFixed(0)}` : "";
+              return (
+                <g
+                  key={slot.codigo}
+                  className={`floor-plan__mesa-group floor-plan__mesa-group--pos${isClickable ? " floor-plan__mesa-group--clickable" : ""}`}
+                  onClick={isClickable ? () => onSelectMesa(slot.codigo, estado) : undefined}
+                  role={isClickable ? "button" : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  aria-label={isClickable ? `Mesa ${slot.codigo} · ${estado}` : undefined}
+                  onKeyDown={isClickable ? (e) => e.key === "Enter" && onSelectMesa(slot.codigo, estado) : undefined}
+                >
+                  <rect x={x} y={y} width={w} height={h} rx="2.5" fill={color} opacity="0.85" />
+                  <text x={x + w / 2} y={y + h * 0.32} textAnchor="middle" fill="#fff" fontSize="6" fontWeight="900">
+                    {slot.codigo}
+                  </text>
+                  {m && (
+                    <text x={x + w / 2} y={y + h * 0.55} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize="2.9" fontWeight="600">
+                      {m.etiqueta} · {m.capacidad}p
+                    </text>
+                  )}
+                  {estado !== "Libre" && (
+                    <text x={x + w / 2} y={y + h * 0.76} textAnchor="middle" fill="rgba(255,255,255,0.95)" fontSize="2.8" fontWeight="700">
+                      {ESTADO_LABEL[estado]}
+                    </text>
+                  )}
+                  {totalStr && (
+                    <text x={x + w / 2} y={y + h - 3.5} textAnchor="middle" fill="#fff" fontSize="2.8" fontWeight="800">
+                      {totalStr}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`floor-plan floor-plan--${variant}`}>

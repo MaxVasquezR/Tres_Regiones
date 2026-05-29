@@ -68,18 +68,18 @@ export default function Register() {
       <section className="auth-split__story" style={{ backgroundImage: `url(${AUTH_IMAGE})` }}>
         <div className="auth-split__overlay" />
         <div className="auth-split__story-inner">
-          <p className="eyebrow eyebrow--light">Registro visitante</p>
-          <h1>{funnelPedido ? "Tu número abre el canal de venta" : "Anticipa tu experiencia en sala"}</h1>
+          <p className="eyebrow eyebrow--light">⚡ Crea tu cuenta</p>
+          <h1>{funnelPedido ? "Un paso para pedir tu delivery Guepardo" : "Pide rápido y sigue tu pedido en vivo"}</h1>
           <p>
             {funnelPedido ? (
               <>
-                Solo pedimos <strong>nombre</strong> y <strong>celular</strong>: así te llamamos en todo el proceso y
-                tu mismo número será tu contraseña al entrar. El correo es opcional (factura o avisos).
+                Solo necesitamos tu <strong>nombre</strong> y <strong>celular</strong>: tu mismo número será tu clave
+                para entrar y por ahí te ubica el repartidor. El correo es opcional.
               </>
             ) : (
               <>
-                Registro mínimo serio: nombre y celular peruano. Sin correo obligatorio; si lo das, úsalo para
-                comprobantes o recuperación cuando activemos esa fase.
+                Regístrate en segundos con nombre y celular. Guarda tus direcciones, revisa tu historial y paga con
+                Yape/Plin, tarjeta o efectivo.
               </>
             )}
           </p>
@@ -91,12 +91,12 @@ export default function Register() {
 
       <section className="auth-split__panel">
         <div className="card auth__card">
-          <p className="eyebrow">Nuevo visitante</p>
+          <p className="eyebrow">Nueva cuenta</p>
           <h2 className="auth__title">Crear cuenta</h2>
           <p className="auth__subtitle">
             {funnelPedido
-              ? "Nombre y celular obligatorios. Tu celular es tu contraseña al iniciar sesión."
-              : "Te llamaremos por tu nombre en reservas y pedidos."}
+              ? "Nombre y celular. Tu celular será tu clave para iniciar sesión."
+              : "Te identificamos por tu nombre en tus pedidos y reservas."}
           </p>
 
           <div className="notice notice--spaced" role="note" style={{ marginBottom: 16 }}>

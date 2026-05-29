@@ -7,15 +7,16 @@ export default function ClientFooter() {
         <div>
           <p className="site-footer__brand">TRES REGIONES</p>
           <p className="site-footer__tagline">
-            Reservas, pedidos a domicilio y panel operativo para restaurantes. Tres Regiones, cocina costa, sierra y
-            selva.
+            La cadena de comida peruana más rápida del mundo. Delivery Guepardo en Los Olivos, San Martín de Porres y
+            Comas. Pedidos en ~28 min.
           </p>
         </div>
-            <div className="site-footer__links">
-          <Link to="/">Inicio</Link>
-          <Link to="/carrito">Carrito / delivery</Link>
+        <div className="site-footer__links">
+          <Link to="/">Carta y delivery</Link>
+          <Link to="/mis-pedidos">Mis pedidos</Link>
           <Link to="/reservar">Reservar mesa</Link>
-          <Link to="/admin/login">Panel del local</Link>
+          <Link to="/mozo/login">Acceso personal</Link>
+          <Link to="/admin/login">Administración</Link>
         </div>
       </div>
     </footer>

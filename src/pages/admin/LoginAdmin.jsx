@@ -106,11 +106,7 @@ export default function LoginAdmin() {
           </form>
 
           <p className="hint">
-            Evaluación web: <strong>Mayra Cliente Demo</strong> · celular <strong>999888777</strong>
-          </p>
-
-          <p className="hint">
-            ¿Problemas para ingresar? <Link to="/login">Ir al acceso visitante</Link>
+            ¿Problemas para ingresar? <Link to="/login">Ir al acceso de clientes</Link>
           </p>
         </div>
       </div>

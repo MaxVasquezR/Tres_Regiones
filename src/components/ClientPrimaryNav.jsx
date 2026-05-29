@@ -1,8 +1,14 @@
-import { Link, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
+import { useGoHome } from "../hooks/useGoHome";
 
-export default function ClientPrimaryNav({ mode = "topbar", onItemActivate, logueado, countPlatos }) {
+export default function ClientPrimaryNav({ mode = "topbar", onItemActivate, logueado }) {
+  const goHome = useGoHome();
   const pick = () => {
     if (typeof onItemActivate === "function") onItemActivate();
+  };
+  const onCarta = (e) => {
+    goHome(e);
+    pick();
   };
   const nl = (isActive) =>
     mode === "sheet"
@@ -11,27 +17,24 @@ export default function ClientPrimaryNav({ mode = "topbar", onItemActivate, logu
 
   return (
     <nav className={mode === "sheet" ? "nav nav--sheet" : "nav"} aria-label="Navegación principal">
-      <NavLink to="/" end className={({ isActive }) => nl(isActive)} onClick={pick}>
-        Inicio
+      <NavLink to="/" end className={({ isActive }) => nl(isActive)} onClick={onCarta}>
+        Carta
       </NavLink>
-      <Link to="/carrito" className={mode === "sheet" ? "navlink navlink--sheet" : "navlink"} onClick={pick}>
-        Pedido{countPlatos ? ` (${countPlatos})` : ""}
-      </Link>
+      <NavLink to="/carrito" className={({ isActive }) => nl(isActive)} onClick={pick}>
+        Carrito
+      </NavLink>
+      {logueado && (
+        <NavLink to="/mis-pedidos" className={({ isActive }) => nl(isActive)} onClick={pick}>
+          Mis pedidos
+        </NavLink>
+      )}
       {!logueado ? (
-        <Link to="/login" state={{ from: "/reservar" }} className={mode === "sheet" ? "navlink navlink--sheet navlink--sheet-cta" : "navlink navlink--cta"} onClick={pick}>
-          Reservar
-        </Link>
+        <NavLink to="/login" state={{ from: "/reservar" }} className={({ isActive }) => nl(isActive)} onClick={pick}>
+          Reservar mesa
+        </NavLink>
       ) : (
-        <NavLink
-          to="/reservar"
-          className={({ isActive }) =>
-            mode === "sheet"
-              ? `navlink navlink--sheet navlink--sheet-cta${isActive ? " navlink--sheet-active" : ""}`
-              : `navlink navlink--cta${isActive ? " navlink--active" : ""}`
-          }
-          onClick={pick}
-        >
-          Reservar
+        <NavLink to="/reservar" className={({ isActive }) => nl(isActive)} onClick={pick}>
+          Reservar mesa
         </NavLink>
       )}
       {!logueado ? (
@@ -44,7 +47,7 @@ export default function ClientPrimaryNav({ mode = "topbar", onItemActivate, logu
           </NavLink>
         </>
       ) : null}
-      <NavLink to="/admin/login" className={({ isActive }) => nl(isActive)} onClick={pick}>
+      <NavLink to="/mozo/login" className={({ isActive }) => nl(isActive)} onClick={pick}>
         Personal
       </NavLink>
     </nav>

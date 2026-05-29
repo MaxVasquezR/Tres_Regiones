@@ -1,216 +1,162 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-const STORAGE_KEY = "tres_regiones_cart_v1";
-const DELIVERY_FEE = 10;
+const STORAGE_KEY = "tr_cart_v1";
 
-const emptyDireccion = () => ({
-  calle: "",
-  distrito: "",
-  urbanizacion: "",
-  referencia: "",
-  etiqueta: "",
-  lat: null,
-  lng: null,
-  fuente: "",
-});
-
-function parsePrecioSoles(precioStr) {
-  const m = String(precioStr ?? "")
-    .replace(/,/g, ".")
-    .match(/(\d+(?:\.\d{1,2})?)/);
-  return m ? Number(m[1]) : 0;
-}
-
-function loadStored() {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const o = JSON.parse(raw);
-    if (!o || typeof o !== "object") return null;
-    return o;
-  } catch {
-    return null;
-  }
-}
+const PROMOS_VALIDOS = {
+  GUEPARDO: { pct: 10, label: "Guepardo -10%" },
+  VELOZ28: { pct: 5, label: "Entrega veloz -5%" },
+  REGIONES: { pct: 15, label: "Tres Regiones -15%", maxSoles: 35 },
+};
 
 const CartContext = createContext(null);
 
+function parsePrecio(v) {
+  if (typeof v === "number") return v;
+  return Number(String(v ?? "").replace(/[^0-9.]/g, "")) || 0;
+}
+
+function readState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return {
+        items: Array.isArray(parsed.items) ? parsed.items : [],
+        sedeId: typeof parsed.sedeId === "string" ? parsed.sedeId : null,
+        promoCode: typeof parsed.promoCode === "string" ? parsed.promoCode : "",
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { items: [], sedeId: null, promoCode: "" };
+}
+
 export function CartProvider({ children }) {
-  const stored = typeof sessionStorage !== "undefined" ? loadStored() : null;
-  const [items, setItems] = useState(() => (Array.isArray(stored?.items) ? stored.items : []));
-  const [delivery, setDelivery] = useState(Boolean(stored?.delivery));
-  const [direccion, setDireccion] = useState(() => {
-    const s = stored?.direccion && typeof stored.direccion === "object" ? stored.direccion : {};
-    const base = emptyDireccion();
-    const lat = Number(s.lat);
-    const lng = Number(s.lng);
-    const fu = String(s.fuente || "").toLowerCase();
-    return {
-      ...base,
-      ...s,
-      etiqueta: String(s.etiqueta ?? base.etiqueta).slice(0, 240),
-      lat: Number.isFinite(lat) ? Math.round(lat * 1e6) / 1e6 : null,
-      lng: Number.isFinite(lng) ? Math.round(lng * 1e6) / 1e6 : null,
-      fuente: fu === "gps" || fu === "mapa" || fu === "manual" ? fu : "",
-    };
-  });
+  const initial = readState();
+  const [items, setItems] = useState(initial.items);
+  const [sedeId, setSedeId] = useState(initial.sedeId);
+  const [promoCode, setPromoCode] = useState(initial.promoCode || "");
 
   useEffect(() => {
-    const payload = { items, delivery, direccion };
-    try {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      /* ignore */
-    }
-  }, [items, delivery, direccion]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, sedeId, promoCode }));
+  }, [items, sedeId, promoCode]);
 
-  const countPlatos = useMemo(() => items.reduce((n, x) => n + x.qty, 0), [items]);
-
-  const subtotalSoles = useMemo(
-    () => Math.round(items.reduce((s, x) => s + x.precioSoles * x.qty, 0) * 100) / 100,
-    [items],
-  );
-
-  const deliverySoles = delivery ? DELIVERY_FEE : 0;
-  const totalSoles = Math.round((subtotalSoles + deliverySoles) * 100) / 100;
-
-  const addPlato = useCallback((plato) => {
-    const precioSoles = parsePrecioSoles(plato.precio);
-    if (precioSoles <= 0) return;
+  const addPlato = useCallback((plato, qty = 1, notas = "") => {
+    const key = `p:${plato.id}:${notas}`;
     setItems((prev) => {
-      const idx = prev.findIndex((x) => x.platoId === plato.id);
-      if (idx === -1) {
-        return [
-          ...prev,
-          {
-            platoId: plato.id,
-            nombre: plato.nombre,
-            precioDisplay: plato.precio,
-            precioSoles,
-            imagen: plato.imagen ?? "",
-            qty: 1,
-          },
-        ];
+      const existing = prev.find((x) => x.key === key);
+      if (existing) {
+        return prev.map((x) => (x.key === key ? { ...x, qty: Math.min(30, x.qty + qty) } : x));
       }
-      const next = [...prev];
-      next[idx] = { ...next[idx], qty: Math.min(20, next[idx].qty + 1) };
-      return next;
+      return [
+        ...prev,
+        {
+          key,
+          tipo: "plato",
+          platoId: plato.id,
+          nombre: plato.nombre,
+          precioSoles: parsePrecio(plato.precio),
+          qty: Math.min(30, Math.max(1, qty)),
+          notas,
+          imagen: plato.imagen || "",
+        },
+      ];
     });
   }, []);
 
-  const setQty = useCallback((platoId, qty) => {
-    const q = Math.min(20, Math.max(0, Math.floor(Number(qty)) || 0));
+  const addCombo = useCallback((combo, qty = 1) => {
+    const key = `c:${combo.id}`;
     setItems((prev) => {
-      if (q === 0) return prev.filter((x) => x.platoId !== platoId);
-      return prev.map((x) => (x.platoId === platoId ? { ...x, qty: q } : x));
+      const existing = prev.find((x) => x.key === key);
+      if (existing) {
+        return prev.map((x) => (x.key === key ? { ...x, qty: Math.min(30, x.qty + qty) } : x));
+      }
+      return [
+        ...prev,
+        {
+          key,
+          tipo: "combo",
+          comboId: combo.id,
+          nombre: combo.nombre,
+          precioSoles: parsePrecio(combo.precioCombo),
+          comboItems: combo.items || [],
+          qty: Math.min(30, Math.max(1, qty)),
+          notas: "",
+          imagen: combo.imagen || "",
+        },
+      ];
     });
   }, []);
 
-  const removeLine = useCallback((platoId) => {
-    setItems((prev) => prev.filter((x) => x.platoId !== platoId));
+  const setQty = useCallback((key, qty) => {
+    setItems((prev) =>
+      qty <= 0
+        ? prev.filter((x) => x.key !== key)
+        : prev.map((x) => (x.key === key ? { ...x, qty: Math.min(30, qty) } : x)),
+    );
   }, []);
 
-  const clearCart = useCallback(() => {
-    setItems([]);
-    setDelivery(false);
-    setDireccion(emptyDireccion());
-    try {
-      sessionStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+  const removeItem = useCallback((key) => {
+    setItems((prev) => prev.filter((x) => x.key !== key));
   }, []);
 
-  const mergeDireccion = useCallback((patch) => {
-    setDireccion((d) => {
-      const next = { ...d };
-      if (patch.calle !== undefined) next.calle = String(patch.calle).slice(0, 160);
-      if (patch.distrito !== undefined) next.distrito = String(patch.distrito).slice(0, 80);
-      if (patch.urbanizacion !== undefined) next.urbanizacion = String(patch.urbanizacion).slice(0, 80);
-      if (patch.referencia !== undefined) next.referencia = String(patch.referencia).slice(0, 200);
-      if (patch.lat !== undefined) {
-        const n = Number(patch.lat);
-        next.lat = Number.isFinite(n) ? Math.round(n * 1e6) / 1e6 : null;
-      }
-      if (patch.lng !== undefined) {
-        const n = Number(patch.lng);
-        next.lng = Number.isFinite(n) ? Math.round(n * 1e6) / 1e6 : null;
-      }
-      if (patch.fuente !== undefined) {
-        const f = String(patch.fuente).toLowerCase();
-        next.fuente = f === "gps" || f === "mapa" || f === "manual" ? f : "";
-      }
-      if (patch.etiqueta !== undefined) {
-        next.etiqueta = String(patch.etiqueta ?? "").slice(0, 240);
-      }
-      return next;
-    });
+  const clear = useCallback(() => setItems([]), []);
+
+  const setSede = useCallback((id) => setSedeId(id || null), []);
+
+  const subtotal = useMemo(() => items.reduce((s, x) => s + x.precioSoles * x.qty, 0), [items]);
+  const count = useMemo(() => items.reduce((s, x) => s + x.qty, 0), [items]);
+
+  const promo = useMemo(() => {
+    const key = String(promoCode || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    return PROMOS_VALIDOS[key] ? { code: key, ...PROMOS_VALIDOS[key] } : null;
+  }, [promoCode]);
+
+  const descuentoSoles = useMemo(() => {
+    if (!promo || subtotal <= 0) return 0;
+    let d = Math.round(subtotal * (promo.pct / 100) * 100) / 100;
+    if (promo.maxSoles != null) d = Math.min(d, promo.maxSoles);
+    return d;
+  }, [promo, subtotal]);
+
+  const applyPromo = useCallback((code) => {
+    const key = String(code || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    if (!PROMOS_VALIDOS[key]) return { ok: false, error: "Código no válido. Prueba GUEPARDO, VELOZ28 o REGIONES." };
+    setPromoCode(key);
+    return { ok: true, promo: PROMOS_VALIDOS[key] };
   }, []);
 
-  const setDireccionField = useCallback((key, value) => {
-    setDireccion((d) => {
-      if (key === "lat" || key === "lng") {
-        const n = Number(value);
-        return { ...d, [key]: Number.isFinite(n) ? Math.round(n * 1e6) / 1e6 : null };
-      }
-      if (key === "fuente") {
-        const f = String(value ?? "").toLowerCase();
-        const ok = f === "gps" || f === "mapa" || f === "manual";
-        return { ...d, fuente: ok ? f : "" };
-      }
-      const max =
-        key === "referencia"
-          ? 200
-          : key === "distrito"
-            ? 80
-            : key === "urbanizacion"
-              ? 80
-              : key === "etiqueta"
-                ? 240
-                : 160;
-      return { ...d, [key]: String(value ?? "").slice(0, max) };
-    });
-  }, []);
+  const clearPromo = useCallback(() => setPromoCode(""), []);
 
-  const value = useMemo(
-    () => ({
-      items,
-      delivery,
-      setDelivery,
-      direccion,
-      setDireccionField,
-      mergeDireccion,
-      addPlato,
-      setQty,
-      removeLine,
-      clearCart,
-      countPlatos,
-      subtotalSoles,
-      deliverySoles,
-      totalSoles,
-      deliveryFee: DELIVERY_FEE,
-    }),
-    [
-      items,
-      delivery,
-      direccion,
-      mergeDireccion,
-      addPlato,
-      setQty,
-      removeLine,
-      clearCart,
-      countPlatos,
-      subtotalSoles,
-      deliverySoles,
-      totalSoles,
-      setDireccionField,
-    ],
-  );
+  const value = {
+    items,
+    sedeId,
+    subtotal,
+    descuentoSoles,
+    promo,
+    promoCode,
+    applyPromo,
+    clearPromo,
+    count,
+    addPlato,
+    addCombo,
+    setQty,
+    removeItem,
+    clear,
+    setSede,
+  };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- hook colocado junto al provider
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCart() {
   const ctx = useContext(CartContext);
   if (!ctx) throw new Error("useCart debe usarse dentro de CartProvider");

@@ -128,7 +128,7 @@ export default function Reservas() {
     <div>
       <h1 style={{ marginBottom: "16px", color: "var(--brand-700)" }}>Reservas</h1>
       <p style={{ marginBottom: 14 }}>
-        Control total de la agenda: estados operativos, datos de turismo, depósitos y notas internas de sala.
+        Control total de la agenda: estados operativos, datos del cliente, depósitos y notas internas de sala.
       </p>
 
       {!ready && (

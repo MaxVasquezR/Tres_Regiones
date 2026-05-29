@@ -90,3 +90,49 @@ export function haySesionAdmin() {
   const s = readSession();
   return s?.role === "admin" && !!s?.token;
 }
+
+export function iniciarSesionMozo({ token, user }) {
+  saveSession({
+    role: "mozo",
+    token,
+    nombre: String(user?.nombre || "Mozo").trim(),
+    mozoId: user?.id ?? null,
+    at: new Date().toISOString(),
+  });
+}
+
+export function haySesionMozo() {
+  const s = readSession();
+  return s?.role === "mozo" && !!s?.token;
+}
+
+export function haySesionMozoOrAdmin() {
+  const s = readSession();
+  return (s?.role === "mozo" || s?.role === "admin") && !!s?.token;
+}
+
+export function nombreParaMostrarMozo(sesion) {
+  if (!sesion) return "";
+  if (sesion.role === "mozo") return String(sesion.nombre || "Mozo").trim();
+  if (sesion.role === "admin") return String(sesion.usuario || "Admin").trim();
+  return "";
+}
+
+export function iniciarSesionCocina({ token, user }) {
+  saveSession({
+    role: "cocina",
+    token,
+    nombre: String(user?.nombre || "Cocina").trim(),
+    at: new Date().toISOString(),
+  });
+}
+
+export function haySesionCocina() {
+  const s = readSession();
+  return s?.role === "cocina" && !!s?.token;
+}
+
+export function haySesionStaff() {
+  const s = readSession();
+  return ["mozo", "admin", "cocina"].includes(s?.role) && !!s?.token;
+}

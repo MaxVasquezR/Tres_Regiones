@@ -1,12 +1,41 @@
 import { Outlet, NavLink } from "react-router-dom";
 import { cerrarSesion, haySesionAdmin, nombreParaMostrarAdmin, obtenerSesion } from "../session";
 import { useEffect, useState } from "react";
+import { apiGet } from "../api";
+import { getAdminSede, setAdminSede } from "../data/adminSede";
+
+const NAV = [
+  { to: "/admin/operaciones", label: "Centro de operación" },
+  { to: "/admin/dashboard", label: "Dashboard" },
+  { to: "/admin/ventas", label: "Ventas sala" },
+  { to: "/admin/cierre-caja", label: "Cierre de caja" },
+  { to: "/admin/platos", label: "Carta · platos" },
+  { to: "/admin/menu-del-dia", label: "Menú del día" },
+  { to: "/admin/reservas", label: "Reservas" },
+  { to: "/admin/calendario", label: "Calendario" },
+  { to: "/admin/cuentas", label: "Cuentas" },
+  { to: "/admin/perfil", label: "Perfil del local" },
+];
 
 export default function AdminLayout() {
   const [, setTick] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [sedes, setSedes] = useState([]);
+  const [sedeSel, setSedeSel] = useState(getAdminSede());
   const sesion = obtenerSesion();
   const adminOn = haySesionAdmin();
+
+  useEffect(() => {
+    if (!adminOn) return;
+    apiGet("/api/sedes")
+      .then((r) => setSedes(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setSedes([]));
+  }, [adminOn]);
+
+  const cambiarSede = (id) => {
+    setSedeSel(id);
+    setAdminSede(id);
+  };
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -23,34 +52,22 @@ export default function AdminLayout() {
 
   const nav = (
     <nav className="sidebar__nav">
-      <NavLink
-        to="/admin/operaciones"
-        className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`}
-        onClick={closeDrawer}
-      >
-        Centro de operación
+      {NAV.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`}
+          onClick={closeDrawer}
+        >
+          {item.label}
+        </NavLink>
+      ))}
+      <div className="sidebar__divider" />
+      <NavLink to="/mozo/mesas" className="sidelink sidelink--external" onClick={closeDrawer}>
+        Pantalla mozo
       </NavLink>
-      <NavLink
-        to="/admin/dashboard"
-        className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`}
-        onClick={closeDrawer}
-      >
-        Dashboard
-      </NavLink>
-      <NavLink to="/admin/cuentas" className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`} onClick={closeDrawer}>
-        Cuentas
-      </NavLink>
-      <NavLink to="/admin/reservas" className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`} onClick={closeDrawer}>
-        Reservas
-      </NavLink>
-      <NavLink to="/admin/calendario" className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`} onClick={closeDrawer}>
-        Calendario
-      </NavLink>
-      <NavLink to="/admin/perfil" className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`} onClick={closeDrawer}>
-        Perfil del local
-      </NavLink>
-      <NavLink to="/admin/pedidos" className={({ isActive }) => `sidelink ${isActive ? "sidelink--active" : ""}`} onClick={closeDrawer}>
-        Pedidos web
+      <NavLink to="/cocina" className="sidelink sidelink--external" onClick={closeDrawer}>
+        Pantalla cocina
       </NavLink>
       {adminOn && (
         <button
@@ -78,10 +95,8 @@ export default function AdminLayout() {
       <aside className="sidebar" aria-label="Navegación administrativa">
         <div className="sidebar__brand-block">
           <h2 className="sidebar__title">TRES REGIONES</h2>
-          <p className="sidebar__subtitle">Plataforma operativa</p>
-          {adminOn ? (
-            <p className="sidebar__session">Hola, {nombreParaMostrarAdmin(sesion)}</p>
-          ) : null}
+          <p className="sidebar__subtitle">Gestión operativa</p>
+          {adminOn ? <p className="sidebar__session">{nombreParaMostrarAdmin(sesion)}</p> : null}
         </div>
         {nav}
       </aside>
@@ -91,7 +106,7 @@ export default function AdminLayout() {
           <button
             type="button"
             className="admin-mobile-toolbar__btn"
-            aria-label="Abrir menú del panel"
+            aria-label="Abrir menú"
             aria-expanded={drawerOpen}
             onClick={() => setDrawerOpen(true)}
           >
@@ -99,15 +114,30 @@ export default function AdminLayout() {
             <span className="admin-mobile-toolbar__line" aria-hidden />
             <span className="admin-mobile-toolbar__line" aria-hidden />
           </button>
-          <span className="admin-mobile-toolbar__title">Operación</span>
+          <span className="admin-mobile-toolbar__title">Administración</span>
         </div>
 
         <div className="admin__inner">
           {adminOn ? (
             <header className="admin-topbar admin-topbar--desktop-only">
-              <span className="admin-topbar__hello" title={sesion?.usuario ? `Usuario: ${sesion.usuario}` : undefined}>
-                Hola, {nombreParaMostrarAdmin(sesion)}
-              </span>
+              <span className="admin-topbar__hello">Hola, {nombreParaMostrarAdmin(sesion)}</span>
+              {sedes.length > 0 && (
+                <label className="admin-sede-picker">
+                  <span>Sede</span>
+                  <select
+                    className="input input--compact"
+                    value={sedeSel}
+                    onChange={(e) => cambiarSede(e.target.value)}
+                  >
+                    <option value="">Todas las sedes</option>
+                    {sedes.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.distrito}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </header>
           ) : null}
           <Outlet />

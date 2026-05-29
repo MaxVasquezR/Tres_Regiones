@@ -11,11 +11,12 @@ export default function Confirmacion() {
   return (
     <div className="confirmation-page">
       <div className="container container--wide">
-        <div className="confirmation">
+        <div className="confirmation confirmation--celebrate">
           <div
             className={`confirmation__ticket card card--pad${flow === "reserva" && reserva?.mesa ? " confirmation__ticket--wide" : ""}`}
           >
-            <p className="eyebrow">{flow === "reserva" ? "Reserva presencial confirmada" : "Cuenta creada"}</p>
+            <p className="confirmation__burst" aria-hidden>✨</p>
+            <p className="eyebrow">{flow === "reserva" ? "Reserva confirmada" : "Cuenta lista"}</p>
             <h1 className="section-title">
               {flow === "reserva" ? "Tu mesa quedó registrada" : "Bienvenido a TRES REGIONES"}
             </h1>
@@ -24,7 +25,7 @@ export default function Confirmacion() {
               <>
                 <p className="section-lead">
                   El restaurante recibió tu separación con depósito de <strong>S/ 20</strong>. Presenta esta confirmación
-                  al llegar al local; servicio en sala únicamente (sin delivery).
+                  al llegar al local. Servicio presencial en mesa.
                 </p>
                 {reserva && (
                   <div className="confirmation__summary">
@@ -55,15 +56,8 @@ export default function Confirmacion() {
             ) : (
               <>
                 <p className="section-lead">
-                  Tu cuenta está lista. Inicia sesión para armar tu pedido o reserva; pagos y delivery siguen el flujo
-                  que el local tenga habilitado.
+                  Tu cuenta está lista. Consulta la carta y reserva tu mesa cuando lo necesites.
                 </p>
-                {location.state?.funnel === "pedido" ? (
-                  <p className="notice notice--spaced">
-                    Venías del <strong>pedido o checkout</strong>: entra con tu cuenta y continúa en el carrito o en
-                    reservas. El local ve el detalle en su panel operativo.
-                  </p>
-                ) : null}
               </>
             )}
 

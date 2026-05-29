@@ -5,12 +5,14 @@ import { useReservations } from "../context/ReservationsContext";
 import { useCart } from "../context/CartContext";
 import ClientFooter from "../components/ClientFooter";
 import ClientPrimaryNav from "../components/ClientPrimaryNav";
+import ClientBrandLink from "../components/ClientBrandLink";
+import { useGoHome } from "../hooks/useGoHome";
 
 const AUTH_ROUTES = new Set(["/login", "/register"]);
 
 export default function ClientLayout() {
   const { refresh } = useReservations();
-  const { countPlatos } = useCart();
+  const { count } = useCart();
   const [, setTick] = useState(0);
   const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
@@ -35,63 +37,51 @@ export default function ClientLayout() {
   }, [navOpen, authRoute]);
 
   const closeNav = () => setNavOpen(false);
+  const goHome = useGoHome();
 
   return (
-    <div className={`client-shell${authRoute ? "" : " client-shell--app"}`}>
-      {!authRoute && (
-        <header className="topbar">
-          <div className="topbar__inner container container--wide">
-            <div className="brand">
-              <span className="brand__mark" aria-hidden>
-                TR
-              </span>
-              <div className="brand__copy">
-                <span className="brand__name">TRES REGIONES</span>
-                <span className="brand__tagline">Costa · Sierra · Selva · Lima</span>
+    <div className={`client-shell client-shell--brand-always${authRoute ? "" : " client-shell--app"}`}>
+      <header className={`topbar topbar--persistent${authRoute ? " topbar--compact" : ""}`}>
+        <div className="topbar__inner container container--wide">
+          <ClientBrandLink />
+
+          {!authRoute && (
+            <>
+              <button
+                type="button"
+                className="topbar__burger"
+                aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
+                aria-expanded={navOpen}
+                onClick={() => setNavOpen((o) => !o)}
+              >
+                <span className="topbar__burger-line" aria-hidden />
+                <span className="topbar__burger-line" aria-hidden />
+                <span className="topbar__burger-line" aria-hidden />
+              </button>
+
+              <div className="topbar__cluster">
+                <ClientPrimaryNav logueado={logueado} mode="topbar" />
+                {logueado && (
+                  <div className="topbar__user-actions">
+                    <span className="topbar__hello">Hola, {nombreParaMostrarCliente(sesion)}</span>
+                    <button
+                      type="button"
+                      className="navlink navlink--button"
+                      onClick={() => {
+                        cerrarSesion();
+                        void refresh();
+                        setTick((t) => t + 1);
+                      }}
+                    >
+                      Cerrar sesión
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-
-            <button
-              type="button"
-              className="topbar__burger"
-              aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
-              aria-expanded={navOpen}
-              onClick={() => setNavOpen((o) => !o)}
-            >
-              <span className="topbar__burger-line" aria-hidden />
-              <span className="topbar__burger-line" aria-hidden />
-              <span className="topbar__burger-line" aria-hidden />
-            </button>
-
-            <div className="topbar__cluster">
-              <ClientPrimaryNav logueado={logueado} countPlatos={countPlatos} mode="topbar" />
-              {logueado && (
-                <div className="topbar__user-actions">
-                  <span
-                    className="topbar__hello"
-                    title={
-                      sesion?.correo ? `Correo: ${sesion.correo}` : sesion?.telefono ? `Celular: ${sesion.telefono}` : undefined
-                    }
-                  >
-                    Hola, {nombreParaMostrarCliente(sesion)}
-                  </span>
-                  <button
-                    type="button"
-                    className="navlink navlink--button"
-                    onClick={() => {
-                      cerrarSesion();
-                      void refresh();
-                      setTick((t) => t + 1);
-                    }}
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-      )}
+            </>
+          )}
+        </div>
+      </header>
 
       {!authRoute && navOpen ? (
         <>
@@ -104,46 +94,33 @@ export default function ClientLayout() {
               </button>
             </div>
             <div className="topbar__sheet-body">
-              <ClientPrimaryNav logueado={logueado} countPlatos={countPlatos} mode="sheet" onItemActivate={closeNav} />
-              {logueado ? (
-                <div className="topbar__sheet-user">
-                  <p className="topbar__sheet-user-name">{nombreParaMostrarCliente(sesion)}</p>
-                  <button
-                    type="button"
-                    className="btn btn--outline-dark btn--block"
-                    onClick={() => {
-                      cerrarSesion();
-                      void refresh();
-                      setTick((t) => t + 1);
-                      closeNav();
-                    }}
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
-              ) : null}
+              <ClientPrimaryNav logueado={logueado} mode="sheet" onItemActivate={closeNav} />
             </div>
           </aside>
         </>
       ) : null}
 
       {!authRoute && (
-        <div className="presale-strip" role="note">
+        <div className="presale-strip presale-strip--pro" role="note">
           <div className="container container--wide presale-strip__inner">
-            <span className="presale-strip__badge">
-              <span className="presale-strip__badge-text presale-strip__badge-text--full">Tres Regiones · Lima</span>
-              <span className="presale-strip__badge-text presale-strip__badge-text--compact" aria-hidden>
-                Lima
-              </span>
-            </span>
-            {logueado ? (
-              <span className="presale-strip__session">
-                Sesión: <strong>{nombreParaMostrarCliente(sesion)}</strong>
-              </span>
-            ) : null}
+            <span className="presale-strip__badge">⚡ Delivery Guepardo</span>
             <span className="presale-strip__meta">
-              Software de operación: carta digital, delivery, reservas y panel gerencial en un solo entorno.
+              Los Olivos · San Martín de Porres · Comas. Delivery en ~28 min o reserva tu mesa.
             </span>
+          </div>
+        </div>
+      )}
+
+      {!authRoute && logueado && (
+        <div className="guepardo-vip full-bleed" role="note">
+          <div className="container container--wide guepardo-vip__inner">
+            <span className="guepardo-vip__icon" aria-hidden>🐆</span>
+            <p className="guepardo-vip__text">
+              <strong>Guepardo VIP</strong> — Cada entrega a tiempo suma puntos. Sigue tus pedidos y acumula beneficios.
+            </p>
+            <Link to="/mis-pedidos" className="btn btn--surface btn--sm">
+              Mis pedidos
+            </Link>
           </div>
         </div>
       )}
@@ -163,29 +140,36 @@ export default function ClientLayout() {
           <NavLink
             to="/"
             end
-            className={({ isActive }) => `client-bottom-nav__item${isActive ? " client-bottom-nav__item--active" : ""}`}
-            onClick={closeNav}
+            className={({ isActive }) =>
+              `client-bottom-nav__item${isActive ? " client-bottom-nav__item--active" : ""}`
+            }
+            onClick={goHome}
           >
-            Inicio
+            <span className="client-bottom-nav__icon" aria-hidden>🍽️</span>
+            <span className="client-bottom-nav__label">Carta</span>
           </NavLink>
-          <Link to="/carrito" className="client-bottom-nav__item" onClick={closeNav}>
-            Pedido{countPlatos ? ` (${countPlatos})` : ""}
-          </Link>
-          {logueado ? (
-            <NavLink
-              to="/reservar"
-              className={({ isActive }) => `client-bottom-nav__item${isActive ? " client-bottom-nav__item--active" : ""}`}
-              onClick={closeNav}
-            >
-              Reserva
-            </NavLink>
-          ) : (
-            <Link to="/login" className="client-bottom-nav__item client-bottom-nav__item--accent" onClick={closeNav}>
-              Entrar
-            </Link>
-          )}
+          <NavLink
+            to="/carrito"
+            className={({ isActive }) =>
+              `client-bottom-nav__item client-bottom-nav__item--cart${isActive ? " client-bottom-nav__item--active" : ""}`
+            }
+          >
+            <span className="client-bottom-nav__icon" aria-hidden>🛒</span>
+            <span className="client-bottom-nav__label">Carrito</span>
+            {count > 0 && <span className="client-bottom-nav__badge">{count}</span>}
+          </NavLink>
+          <NavLink
+            to="/reservar"
+            className={({ isActive }) =>
+              `client-bottom-nav__item${isActive ? " client-bottom-nav__item--active" : ""}`
+            }
+          >
+            <span className="client-bottom-nav__icon" aria-hidden>📅</span>
+            <span className="client-bottom-nav__label">Reservar</span>
+          </NavLink>
           <button type="button" className="client-bottom-nav__item" onClick={() => setNavOpen(true)}>
-            Menú
+            <span className="client-bottom-nav__icon" aria-hidden>☰</span>
+            <span className="client-bottom-nav__label">Menú</span>
           </button>
         </nav>
       )}

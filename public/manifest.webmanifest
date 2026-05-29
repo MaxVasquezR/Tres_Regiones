@@ -1,11 +1,11 @@
 {
-  "name": "TRES REGIONES — Plataforma gastronómica",
+  "name": "TRES REGIONES — Delivery Guepardo",
   "short_name": "TRES REGIONES",
-  "description": "Carta digital, pedidos, reservas en sala y panel operativo para restaurantes en Perú.",
+  "description": "La cadena de comida peruana más rápida del mundo. Pide delivery o reserva mesa en Lima Norte.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f5f2ec",
-  "theme_color": "#16242e",
+  "theme_color": "#5c2e1a",
   "lang": "es",
   "icons": [
     {

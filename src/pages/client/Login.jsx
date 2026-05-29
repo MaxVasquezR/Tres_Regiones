@@ -60,42 +60,42 @@ export default function Login() {
         <div className="auth-split__overlay auth-gate-hero__overlay-tone" />
 
         <div className="auth-split__story-inner auth-gate-hero__inner">
-          <p className="eyebrow eyebrow--light auth-gate-hero__eyebrow">Restaurante · Lima</p>
+          <p className="eyebrow eyebrow--light auth-gate-hero__eyebrow">⚡ Tres Regiones · Lima Norte</p>
           <h1 className="auth-gate-hero__title">
-            Mesas ocupadas, pedidos claros y cobros registrados en un solo flujo.
+            La comida peruana más rápida del mundo, en tu puerta.
           </h1>
           <p className="auth-gate-hero__lead">
-            Carta en línea, carrito con delivery, reservas en sala y panel del local: una base lista para operar y
-            para conectar pasarela de pago cuando el negocio lo defina.
+            Ingresa con tu nombre y celular para pedir delivery Guepardo, seguir tu pedido en vivo y guardar tus
+            direcciones favoritas.
           </p>
 
-          <div className="auth-gate-kpis" aria-label="Mensajes de valor">
+          <div className="auth-gate-kpis" aria-label="Por qué Tres Regiones">
             <article className="auth-gate-kpis__card">
-              <span className="auth-gate-kpis__value">1 flujo</span>
-              <span className="auth-gate-kpis__label">Carta, pedido, reserva y confirmación alineados</span>
+              <span className="auth-gate-kpis__value">~28 min</span>
+              <span className="auth-gate-kpis__label">Tiempo promedio de entrega del Guepardo</span>
             </article>
             <article className="auth-gate-kpis__card">
-              <span className="auth-gate-kpis__value">Rápido</span>
-              <span className="auth-gate-kpis__label">El cliente entra con nombre y celular y sigue al pedido o reserva</span>
+              <span className="auth-gate-kpis__value">3 sedes</span>
+              <span className="auth-gate-kpis__label">Los Olivos, San Martín de Porres y Comas</span>
             </article>
             <article className="auth-gate-kpis__card">
-              <span className="auth-gate-kpis__value">Escala</span>
-              <span className="auth-gate-kpis__label">Misma base para varios locales, delivery y métodos de pago</span>
+              <span className="auth-gate-kpis__value">Pago fácil</span>
+              <span className="auth-gate-kpis__label">Yape/Plin, tarjeta o efectivo al recibir</span>
             </article>
           </div>
 
           <ul className="auth-split__bullets auth-gate-hero__bullets">
-            <li>Vitrina por regiones del Perú: la experiencia se entiende antes del primer pedido.</li>
-            <li>Panel operativo: ocupación, pedidos y cuentas con vista para gerencia y sala.</li>
-            <li>Pagos con tarjeta, QR y efectivo se integran con la pasarela que el local elija.</li>
+            <li>Sigue tu pedido en vivo: cocina, salida y Guepardo en camino con tu repartidor asignado.</li>
+            <li>Combos y promociones de la semana para pedir en un clic.</li>
+            <li>¿Prefieres venir? También reservas tu mesa desde aquí.</li>
           </ul>
 
           <div className="auth-gate-hero__links">
             <Link to="/register" className="btn btn--ghost">
-              Crear cuenta nueva
+              Crear mi cuenta
             </Link>
             <Link to="/admin/login" className="btn btn--ghost btn--ghost-dim">
-              Acceso personal del local
+              Soy del equipo
             </Link>
           </div>
         </div>
@@ -107,19 +107,18 @@ export default function Login() {
             <p className="funnel-banner" role="status">
               {from === "/checkout" ? (
                 <>
-                  Completa el acceso para <strong>confirmar y pagar tu pedido</strong> (tarjeta, QR o efectivo).
+                  Inicia sesión para <strong>confirmar y pagar tu pedido</strong> (Yape/Plin, tarjeta o efectivo).
                 </>
               ) : (
                 <>
-                  Estás en el <strong>flujo de pedido o reserva</strong>: al entrar continúas hacia sala o checkout con
-                  los mismos datos de contacto.
+                  Inicia sesión y continúa con tu <strong>pedido o reserva</strong> usando los mismos datos.
                 </>
               )}
             </p>
           ) : null}
-          <p className="eyebrow">Acceso visitante</p>
-          <h2 className="auth__title">Entra y ejecuta</h2>
-          <p className="auth__subtitle">Tu nombre registrado y tu celular (misma clave que al crear la cuenta).</p>
+          <p className="eyebrow">Iniciar sesión</p>
+          <h2 className="auth__title">Hola de nuevo 👋</h2>
+          <p className="auth__subtitle">Entra con tu nombre y tu celular (la misma clave de tu registro).</p>
 
           <form onSubmit={handleSubmit} className="auth__form">
             <div className="field">
@@ -163,16 +162,12 @@ export default function Login() {
             {error && <div className="error">{error}</div>}
 
             <button type="submit" className="btn btn--primary" disabled={submitting}>
-              {submitting ? "Ingresando…" : "Ingresar al producto"}
+              {submitting ? "Ingresando…" : "Ingresar"}
             </button>
           </form>
 
-          <p className="demo-credential">
-            Acceso de evaluación: <strong>Mayra Cliente Demo</strong> · celular <strong>999888777</strong> (como contraseña)
-          </p>
-
           <p className="hint">
-            ¿No tienes cuenta? <Link to="/register">Crear cuenta</Link>
+            ¿Primera vez? <Link to="/register">Crea tu cuenta</Link>
           </p>
         </div>
       </section>

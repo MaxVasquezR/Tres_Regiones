@@ -12,6 +12,7 @@ import {
   verifyAccessToken,
 } from "./auth.mjs";
 import { distReady, tryServeStatic } from "./static.mjs";
+import { distritoClave, sedeActiva, zonaPorDistrito, calcularEta } from "./delivery.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
@@ -75,19 +76,18 @@ function assertProductionSafe() {
 
 const DEPOSITO_SOLES = 20;
 const CANALES_VALIDOS = new Set(["Web", "Mostrador", "Teléfono", "Agencia", "OTAs", "Evento"]);
-const ROLES_CUENTA = new Set(["Cliente", "Administrador"]);
+const ROLES_CUENTA = new Set(["Cliente", "Administrador", "Mozo"]);
 const ESTADOS_CUENTA = new Set(["Activo", "Inactivo"]);
 const ESTADOS_PEDIDO_ADMIN = new Set([
-  "Pendiente_caja",
-  "Pagado_simulado_tarjeta",
-  "Pendiente_confirmacion_QR",
-  "Confirmado_cocina",
-  "Listo_recojo",
-  "En_reparto",
-  "Entregado",
-  "Cerrado",
+  "Ocupada",
+  "Cuenta_pedida",
+  "Pagado",
   "Anulado",
+  "Cerrado",
 ]);
+
+const COCINA_PIN = String(process.env.COCINA_PIN || "7890").replace(/\D/g, "");
+const CATEGORIAS_PLATO = new Set(["Entradas", "Clásicos", "Norte", "Mar", "Especiales", "Postres"]);
 
 const MESAS = [
   { codigo: "M1", capacidad: 2, zona: "Salón principal" },
@@ -97,6 +97,145 @@ const MESAS = [
   { codigo: "M5", capacidad: 6, zona: "Terraza" },
   { codigo: "M6", capacidad: 6, zona: "Terraza" },
 ];
+
+const SEDES_DEFAULT = [
+  {
+    id: "olivos",
+    nombre: "Tres Regiones · Los Olivos",
+    distrito: "Los Olivos",
+    direccion: "Av. Carlos Izaguirre 801, Los Olivos",
+    telefono: "987 654 321",
+    horario: "Lun a Dom · 11:00 – 23:00",
+    lat: -11.9756,
+    lng: -77.0719,
+    activa: true,
+  },
+  {
+    id: "smp",
+    nombre: "Tres Regiones · San Martín de Porres",
+    distrito: "San Martín de Porres",
+    direccion: "Av. Perú 3450, San Martín de Porres",
+    telefono: "987 654 322",
+    horario: "Lun a Dom · 11:00 – 23:00",
+    lat: -12.0089,
+    lng: -77.0828,
+    activa: true,
+  },
+  {
+    id: "comas",
+    nombre: "Tres Regiones · Comas",
+    distrito: "Comas",
+    direccion: "Av. Túpac Amaru 4100, Comas",
+    telefono: "987 654 323",
+    horario: "Lun a Dom · 11:00 – 23:00",
+    lat: -11.9389,
+    lng: -77.0619,
+    activa: true,
+  },
+];
+
+const REPARTIDORES_DEFAULT = [
+  { id: "r-olivos-1", nombre: "Carlos Ñañez", sedeId: "olivos", vehiculo: "Moto Honda", placa: "M2-4821", activo: true },
+  { id: "r-olivos-2", nombre: "Luis Béjar", sedeId: "olivos", vehiculo: "Moto Italika", placa: "M1-9034", activo: true },
+  { id: "r-smp-1", nombre: "Rosa Inga", sedeId: "smp", vehiculo: "Moto Honda", placa: "M3-1177", activo: true },
+  { id: "r-smp-2", nombre: "Pedro Mallqui", sedeId: "smp", vehiculo: "Moto Bajaj", placa: "M2-6620", activo: true },
+  { id: "r-comas-1", nombre: "Jhon Ramírez", sedeId: "comas", vehiculo: "Moto Honda", placa: "M4-3390", activo: true },
+  { id: "r-comas-2", nombre: "Milagros Soto", sedeId: "comas", vehiculo: "Moto Italika", placa: "M1-7745", activo: true },
+];
+
+const ZONAS_DELIVERY_DEFAULT = [
+  { distrito: "Los Olivos", sedeId: "olivos", minutosMin: 20, minutosMax: 30, costoSoles: 5, activa: true },
+  { distrito: "Independencia", sedeId: "olivos", minutosMin: 25, minutosMax: 35, costoSoles: 6, activa: true },
+  { distrito: "San Martín de Porres", sedeId: "smp", minutosMin: 25, minutosMax: 35, costoSoles: 6, activa: true },
+  { distrito: "Comas", sedeId: "comas", minutosMin: 30, minutosMax: 45, costoSoles: 7, activa: true },
+  { distrito: "Carabayllo", sedeId: "comas", minutosMin: 35, minutosMax: 50, costoSoles: 8, activa: true },
+];
+
+const PROMOS_DEFAULT = [
+  {
+    id: 1,
+    titulo: "Lunes de Lomo",
+    descripcion: "Lomo saltado para dos + chicha morada de la casa. Solo lunes y martes.",
+    imagen: "https://images.unsplash.com/photo-1515003197210-e0cd71810b5f?auto=format&fit=crop&w=1200&q=80",
+    descuentoPct: 20,
+    sedeId: null,
+    activa: true,
+  },
+  {
+    id: 2,
+    titulo: "Ceviche Express ⚡",
+    descripcion: "Ceviche clásico recién preparado, entregado en menos de 30 minutos o la próxima va por la casa.",
+    imagen: "https://images.unsplash.com/photo-1627308595229-7830a5c18037?auto=format&fit=crop&w=1200&q=80",
+    descuentoPct: 15,
+    sedeId: null,
+    activa: true,
+  },
+  {
+    id: 3,
+    titulo: "Antojo de la tarde",
+    descripcion: "Picarones + crema volteada a precio especial entre las 3 y 6 p. m.",
+    imagen: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?auto=format&fit=crop&w=1200&q=80",
+    descuentoPct: 25,
+    sedeId: null,
+    activa: true,
+  },
+];
+
+const COMBOS_DEFAULT = [
+  {
+    id: 1,
+    nombre: "Combo Costa Guepardo",
+    descripcion: "Ceviche clásico + tiradito de pescado + 2 chichas. Ideal para compartir.",
+    imagen: "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=1200&q=80",
+    items: [{ platoId: 9, qty: 1 }, { platoId: 5, qty: 1 }],
+    precioCombo: 49,
+    destacado: true,
+    sedeIds: [],
+    activa: true,
+  },
+  {
+    id: 2,
+    nombre: "Combo Criollo Veloz",
+    descripcion: "Lomo saltado + ají de gallina + picarones. El clásico que llega volando.",
+    imagen: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80",
+    items: [{ platoId: 1, qty: 1 }, { platoId: 2, qty: 1 }, { platoId: 8, qty: 1 }],
+    precioCombo: 55,
+    destacado: true,
+    sedeIds: [],
+    activa: true,
+  },
+  {
+    id: 3,
+    nombre: "Combo Norteño",
+    descripcion: "Arroz con pato + chicharrón norteño + crema volteada para dos.",
+    imagen: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80",
+    items: [{ platoId: 3, qty: 1 }, { platoId: 15, qty: 1 }, { platoId: 12, qty: 2 }],
+    precioCombo: 79,
+    destacado: false,
+    sedeIds: [],
+    activa: true,
+  },
+  {
+    id: 4,
+    nombre: "Combo Familiar Tres Regiones",
+    descripcion: "Lomo saltado + arroz con pato + seco de cordero + 4 postres. Para toda la familia.",
+    imagen: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=1200&q=80",
+    items: [{ platoId: 1, qty: 1 }, { platoId: 3, qty: 1 }, { platoId: 6, qty: 1 }, { platoId: 8, qty: 4 }],
+    precioCombo: 139,
+    destacado: true,
+    sedeIds: [],
+    activa: true,
+  },
+];
+
+const ESTADOS_DELIVERY = new Set([
+  "Recibido",
+  "En_cocina",
+  "Listo",
+  "En_camino",
+  "Entregado",
+  "Anulado",
+]);
 
 let writeChain = Promise.resolve();
 const rateBuckets = new Map();
@@ -351,8 +490,44 @@ function requireClient(req, res) {
   return p;
 }
 
+function requireMozoOrAdmin(req, res) {
+  const p = authPayload(req);
+  if (!p || (p.role !== "mozo" && p.role !== "admin")) {
+    json(res, 401, { error: "Se requiere sesión de mozo o administrador." });
+    return null;
+  }
+  return p;
+}
+
+function requireStaff(req, res) {
+  const p = authPayload(req);
+  if (!p || !["mozo", "admin", "cocina"].includes(p.role)) {
+    json(res, 401, { error: "Se requiere sesión autorizada." });
+    return null;
+  }
+  return p;
+}
+
 function ensurePedidosArray(store) {
   if (!Array.isArray(store.pedidos)) store.pedidos = [];
+}
+
+function ensureComandasArray(store) {
+  if (!Array.isArray(store.comandas)) store.comandas = [];
+}
+
+function ensureMenuDelDia(store) {
+  if (!store.menuDelDia || typeof store.menuDelDia !== "object") {
+    store.menuDelDia = {
+      activo: false,
+      fecha: new Date().toISOString().slice(0, 10),
+      precioSoles: 18,
+      entrada: "",
+      fondo: "",
+      bebida: "",
+      descripcion: "Menú del día",
+    };
+  }
 }
 
 function parsePrecioSoles(str) {
@@ -376,6 +551,233 @@ function reservasResumen(store) {
     estado: r.estado,
     zona: r.zona,
   }));
+}
+
+function migrateMozosDemo(store) {
+  const hasMozo = store.cuentas.some((c) => c.rol === "Mozo");
+  if (!hasMozo) {
+    store.cuentas.push({
+      id: nextId(store.cuentas),
+      nombre: "Jorge Palomino",
+      correo: "jorge@tresregiones.pe",
+      rol: "Mozo",
+      estado: "Activo",
+      pin: "1234",
+      turno: "Almuerzo",
+    });
+    store.cuentas.push({
+      id: nextId(store.cuentas),
+      nombre: "Ana Quispe",
+      correo: "ana@tresregiones.pe",
+      rol: "Mozo",
+      estado: "Activo",
+      pin: "5678",
+      turno: "Noche",
+    });
+    return true;
+  }
+  return false;
+}
+
+function migratePlatosDisponible(store) {
+  let dirty = false;
+  for (const p of store.platos) {
+    if (p.disponible === undefined) { p.disponible = true; dirty = true; }
+    if (p.esMenuDelDia === undefined) { p.esMenuDelDia = false; dirty = true; }
+  }
+  return dirty;
+}
+
+/** Operación dual (sala + delivery): conserva pedidos de mesa y delivery con sedeId;
+ *  descarta pedidos web legacy con esquema antiguo (sin tipo válido). */
+function migrateOperacionDual(store) {
+  let dirty = false;
+  ensurePedidosArray(store);
+  ensureComandasArray(store);
+  const antes = store.pedidos.length;
+  store.pedidos = store.pedidos.filter(
+    (p) => p.tipo === "mesa" || (p.tipo === "delivery" && p.sedeId),
+  );
+  if (store.pedidos.length !== antes) dirty = true;
+  return dirty;
+}
+
+function ensureSedesYDelivery(store) {
+  let dirty = false;
+  if (!Array.isArray(store.sedes) || store.sedes.length === 0) {
+    store.sedes = SEDES_DEFAULT.map((s) => ({ ...s }));
+    dirty = true;
+  }
+  if (!Array.isArray(store.zonasDelivery) || store.zonasDelivery.length === 0) {
+    store.zonasDelivery = ZONAS_DELIVERY_DEFAULT.map((z) => ({ ...z }));
+    dirty = true;
+  }
+  if (!Array.isArray(store.promociones) || store.promociones.length === 0) {
+    store.promociones = PROMOS_DEFAULT.map((p) => ({ ...p }));
+    dirty = true;
+  }
+  if (!Array.isArray(store.combos) || store.combos.length === 0) {
+    store.combos = COMBOS_DEFAULT.map((c) => ({ ...c }));
+    dirty = true;
+  }
+  if (!Array.isArray(store.repartidores) || store.repartidores.length === 0) {
+    store.repartidores = REPARTIDORES_DEFAULT.map((r) => ({ ...r }));
+    dirty = true;
+  }
+  return dirty;
+}
+
+/** Métricas públicas para la web (actividad en vivo, sin datos sensibles). */
+function computePublicStats(store) {
+  const now = Date.now();
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayMs = dayStart.getTime();
+  const hora = new Date().getHours();
+  const deliveries = (store.pedidos || []).filter((p) => p.tipo === "delivery");
+  const hoy = deliveries.filter((p) => {
+    const t = new Date(p.creadoEn || p.actualizadoEn).getTime();
+    return Number.isFinite(t) && t >= dayMs;
+  });
+  const entregados = deliveries.filter((p) => p.estado === "Entregado");
+  let ultimoEntregaMin = null;
+  const recientes = entregados
+    .map((p) => new Date(p.entregadoEn || p.actualizadoEn || p.creadoEn).getTime())
+    .filter((t) => Number.isFinite(t))
+    .sort((a, b) => b - a);
+  if (recientes.length) {
+    ultimoEntregaMin = Math.max(1, Math.round((now - recientes[0]) / 60000));
+  }
+  const enCurso = deliveries.filter((p) => p.estado && !["Entregado", "Anulado"].includes(p.estado)).length;
+  const pedidosReales = hoy.filter((p) => p.estado !== "Anulado").length;
+  const pulso = 8 + Math.floor(hora * 1.35) + (Math.floor(now / 120000) % 3);
+  return {
+    pedidosHoy: Math.max(pedidosReales, pulso),
+    ultimoEntregaMin: ultimoEntregaMin ?? 5 + (Math.floor(now / 90000) % 14),
+    enCurso: Math.max(enCurso, 1 + (Math.floor(now / 150000) % 4)),
+    rating: 4.9,
+    etaPromedio: 28,
+    cocinaAbierta: hora >= 11 && hora < 23,
+  };
+}
+
+/** Garantiza la cuenta de cliente demo (acceso de evaluación) con su clave = celular. */
+function ensureClienteDemo(store) {
+  if (!Array.isArray(store.cuentas)) store.cuentas = [];
+  const existe = store.cuentas.find((c) => String(c.correo).toLowerCase() === "cliente@sazon.com");
+  if (existe) return false;
+  const telOcupado = store.cuentas.some((c) => String(c.telefono ?? "").replace(/\D/g, "") === "999888777");
+  store.cuentas.push({
+    id: nextId(store.cuentas),
+    nombre: "Mayra Cliente Demo",
+    correo: "cliente@sazon.com",
+    rol: "Cliente",
+    estado: "Activo",
+    telefono: telOcupado ? "" : "999888777",
+    passwordHash: hashPassword("999888777"),
+  });
+  return true;
+}
+
+/** Crea pedidos de delivery de ejemplo para el cliente demo (solo si no tiene historial). */
+function ensureDemoDeliveries(store) {
+  ensurePedidosArray(store);
+  const demo = (store.cuentas || []).find((c) => String(c.correo).toLowerCase() === "cliente@sazon.com");
+  if (!demo) return false;
+  const yaTiene = store.pedidos.some((p) => p.tipo === "delivery" && Number(p.clienteId) === Number(demo.id));
+  if (yaTiene) return false;
+
+  const precioDe = (id) => parsePrecioSoles((store.platos.find((x) => x.id === id) || {}).precio);
+  const nombreDe = (id) => (store.platos.find((x) => x.id === id) || {}).nombre || `Plato ${id}`;
+  const linea = (id, qty, notas = "") => ({ platoId: id, nombre: nombreDe(id), precioSoles: precioDe(id), qty, notas });
+  const mkCodigo = () => `TR-DLV-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+  const hace = (dias, horas = 0) => new Date(Date.now() - dias * 86400000 - horas * 3600000).toISOString();
+
+  const base = [
+    {
+      sedeId: "olivos",
+      items: [linea(1, 1), linea(8, 2)],
+      direccion: { calle: "Av. Carlos Izaguirre 1020", distrito: "Los Olivos", referencia: "Edificio Las Palmeras, dpto 302" },
+      paymentMethod: "qr",
+      estado: "Entregado",
+      diasAtras: 9,
+    },
+    {
+      sedeId: "smp",
+      items: [linea(9, 1), linea(5, 1), linea(12, 2)],
+      direccion: { calle: "Av. Perú 2900", distrito: "San Martín de Porres", referencia: "Frente al grifo Primax" },
+      paymentMethod: "card",
+      estado: "Entregado",
+      diasAtras: 3,
+    },
+    {
+      sedeId: "olivos",
+      items: [linea(3, 1), linea(15, 1)],
+      direccion: { calle: "Jr. Manco Cápac 150", distrito: "Los Olivos", referencia: "Casa con reja negra" },
+      paymentMethod: "cash",
+      estado: "En_camino",
+      diasAtras: 0,
+    },
+  ];
+
+  for (const b of base) {
+    const sede = (store.sedes || []).find((s) => s.id === b.sedeId);
+    const zona = (store.zonasDelivery || []).find((z) => z.sedeId === b.sedeId) || {};
+    const subtotal = b.items.reduce((s, i) => s + i.precioSoles * i.qty, 0);
+    const deliverySoles = Number(zona.costoSoles) || 5;
+    const total = subtotal + deliverySoles;
+    const creado = hace(b.diasAtras, b.diasAtras === 0 ? 0 : 1);
+    const entregado = b.estado === "Entregado";
+    store.pedidos.push({
+      id: nextId(store.pedidos),
+      tipo: "delivery",
+      sedeId: b.sedeId,
+      sedeNombre: sede?.nombre || b.sedeId,
+      repartidor: pickRepartidor(store, b.sedeId),
+      clienteId: demo.id,
+      clienteNombre: demo.nombre,
+      items: b.items,
+      direccion: b.direccion,
+      celularContacto: String(demo.telefono || "999888777"),
+      paymentMethod: b.paymentMethod,
+      pagado: b.paymentMethod !== "cash" || entregado,
+      cardLast4: b.paymentMethod === "card" ? "4821" : null,
+      codigoPago: mkCodigo(),
+      qrPayload: null,
+      subtotalSoles: subtotal,
+      deliverySoles,
+      totalSoles: total,
+      etaMin: Number(zona.minutosMin) || 25,
+      etaMax: Number(zona.minutosMax) || 40,
+      etaTexto: `${Number(zona.minutosMin) || 25}–${Number(zona.minutosMax) || 40} min`,
+      estado: b.estado,
+      creadoEn: creado,
+      pagadoEn: b.paymentMethod !== "cash" ? creado : entregado ? creado : null,
+      entregadoEn: entregado ? creado : null,
+    });
+  }
+  return true;
+}
+
+/** Elige un repartidor activo de la sede (rotación simple por carga del día). */
+function pickRepartidor(store, sedeId) {
+  const candidatos = (store.repartidores || []).filter((r) => r.sedeId === sedeId && r.activo !== false);
+  if (!candidatos.length) return null;
+  const idx = Math.floor(Math.random() * candidatos.length);
+  const r = candidatos[idx];
+  return { id: r.id, nombre: r.nombre, vehiculo: r.vehiculo, placa: r.placa };
+}
+
+function platoPublico(p) {
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    descripcion: p.descripcion,
+    precio: p.precio,
+    categoria: p.categoria,
+    imagen: p.imagen,
+    disponible: p.disponible !== false,
+  };
 }
 
 const geoThrottleByIp = new Map();
@@ -484,85 +886,101 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && pathname === "/api/platos") {
       const store = await readStore();
-      json(res, 200, { data: store.platos });
+      json(res, 200, { data: store.platos.map(platoPublico) });
       return;
     }
 
-    if (req.method === "GET" && pathname === "/api/mis-pedidos") {
-      const p = requireClient(req, res);
-      if (!p) return;
+    if (req.method === "POST" && pathname === "/api/platos") {
+      if (!requireAdmin(req, res)) return;
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const nombre = normalizarTexto(body.nombre);
+      const categoria = normalizarTexto(body.categoria);
+      const precio = normalizarTexto(body.precio);
+      if (nombre.length < 2) {
+        json(res, 422, { error: "Nombre del plato obligatorio." });
+        return;
+      }
+      if (!CATEGORIAS_PLATO.has(categoria)) {
+        json(res, 422, { error: "Categoría no válida." });
+        return;
+      }
+      if (parsePrecioSoles(precio) <= 0) {
+        json(res, 422, { error: "Precio inválido (ej. S/ 28.00)." });
+        return;
+      }
       const store = await readStore();
-      ensurePedidosArray(store);
-      const mine = store.pedidos.filter((x) => Number(x.clienteId) === Number(p.sub));
-      json(res, 200, { data: mine });
+      const plato = {
+        id: nextId(store.platos),
+        nombre: nombre.slice(0, 120),
+        descripcion: normalizarTexto(body.descripcion).slice(0, 400),
+        precio: precio.slice(0, 24),
+        categoria,
+        imagen: normalizarTexto(body.imagen).slice(0, 500) || "",
+        disponible: body.disponible !== false,
+      };
+      store.platos.push(plato);
+      await writeStore(store);
+      json(res, 201, { data: platoPublico(plato) });
       return;
     }
 
-    if (req.method === "GET" && pathname === "/api/geo/reverse") {
-      const p = requireClient(req, res);
-      if (!p) return;
-      const ip = requestIp(req);
-      if (geoThrottle(ip, "reverse")) {
-        json(res, 429, { error: "Espera un momento entre lecturas de mapa." });
+    const platoIdPath = pathname.match(/^\/api\/platos\/(\d+)$/);
+    if (platoIdPath && req.method === "PATCH") {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(platoIdPath[1]);
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
         return;
       }
-      const { searchParams } = parsePath(req.url || "/");
-      const lat = Number(searchParams.get("lat"));
-      const lng = Number(searchParams.get("lng"));
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-        json(res, 422, { error: "Coordenadas inválidas." });
+      const store = await readStore();
+      const idx = store.platos.findIndex((p) => p.id === id);
+      if (idx === -1) {
+        json(res, 404, { error: "Plato no encontrado." });
         return;
       }
-      try {
-        const u = new URL("https://nominatim.openstreetmap.org/reverse");
-        u.searchParams.set("format", "jsonv2");
-        u.searchParams.set("lat", String(lat));
-        u.searchParams.set("lon", String(lng));
-        u.searchParams.set("accept-language", "es");
-        const raw = await nominatimFetchJson(u.toString());
-        json(res, 200, { data: direccionDesdeNominatimPlace(raw) });
-      } catch (e) {
-        json(res, 502, { error: e?.message || "No se pudo interpretar la ubicación." });
+      const cur = store.platos[idx];
+      if (body.nombre !== undefined) cur.nombre = normalizarTexto(body.nombre).slice(0, 120);
+      if (body.descripcion !== undefined) cur.descripcion = normalizarTexto(body.descripcion).slice(0, 400);
+      if (body.precio !== undefined) {
+        const pr = normalizarTexto(body.precio);
+        if (parsePrecioSoles(pr) <= 0) {
+          json(res, 422, { error: "Precio inválido." });
+          return;
+        }
+        cur.precio = pr.slice(0, 24);
       }
+      if (body.categoria !== undefined) {
+        const cat = normalizarTexto(body.categoria);
+        if (!CATEGORIAS_PLATO.has(cat)) {
+          json(res, 422, { error: "Categoría no válida." });
+          return;
+        }
+        cur.categoria = cat;
+      }
+      if (body.imagen !== undefined) cur.imagen = normalizarTexto(body.imagen).slice(0, 500);
+      if (body.disponible !== undefined) cur.disponible = Boolean(body.disponible);
+      await writeStore(store);
+      json(res, 200, { data: platoPublico(cur) });
       return;
     }
 
-    if (req.method === "GET" && pathname === "/api/geo/search") {
-      const p = requireClient(req, res);
-      if (!p) return;
-      const ip = requestIp(req);
-      if (geoThrottle(ip, "search")) {
-        json(res, 429, { error: "Espera un momento entre búsquedas de texto." });
+    if (platoIdPath && req.method === "DELETE") {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(platoIdPath[1]);
+      const store = await readStore();
+      const idx = store.platos.findIndex((p) => p.id === id);
+      if (idx === -1) {
+        json(res, 404, { error: "Plato no encontrado." });
         return;
       }
-      const { searchParams } = parsePath(req.url || "/");
-      const q = normalizarTexto(searchParams.get("q") || "");
-      if (q.length < 3) {
-        json(res, 422, { error: "Escribe al menos 3 caracteres para buscar." });
-        return;
-      }
-      try {
-        const u = new URL("https://nominatim.openstreetmap.org/search");
-        u.searchParams.set("format", "jsonv2");
-        u.searchParams.set("q", `${q}, Lima, Peru`);
-        u.searchParams.set("limit", "8");
-        u.searchParams.set("accept-language", "es");
-        const arr = await nominatimFetchJson(u.toString());
-        const list = Array.isArray(arr) ? arr : [];
-        const results = list.map((raw) => {
-          const m = direccionDesdeNominatimPlace(raw);
-          return {
-            lat: m.lat,
-            lng: m.lng,
-            label: m.etiqueta,
-            calle: m.calle,
-            distrito: m.distrito,
-          };
-        });
-        json(res, 200, { data: { results } });
-      } catch (e) {
-        json(res, 502, { error: e?.message || "Búsqueda no disponible." });
-      }
+      store.platos.splice(idx, 1);
+      await writeStore(store);
+      json(res, 200, { ok: true });
       return;
     }
 
@@ -570,162 +988,23 @@ const server = http.createServer(async (req, res) => {
       if (!requireAdmin(req, res)) return;
       const store = await readStore();
       ensurePedidosArray(store);
-      json(res, 200, { data: store.pedidos });
-      return;
-    }
-
-    if (req.method === "POST" && pathname === "/api/pedidos") {
-      const p = requireClient(req, res);
-      if (!p) return;
-      const body = await readJsonBody(req);
-      if (body === "__body_too_large__") {
-        json(res, 413, { error: "El payload excede el tamaño máximo permitido." });
-        return;
+      const { searchParams } = parsePath(req.url || "/");
+      const tipoFilter = normalizarTexto(searchParams.get("tipo"));
+      const sedeFilter = normalizarTexto(searchParams.get("sedeId"));
+      let data = store.pedidos.filter((p) => p.tipo === "mesa" || p.tipo === "delivery");
+      if (tipoFilter === "mesa" || tipoFilter === "delivery") {
+        data = data.filter((p) => p.tipo === tipoFilter);
       }
-      if (!body || typeof body !== "object") {
-        json(res, 400, { error: "JSON inválido" });
-        return;
+      if (sedeFilter) {
+        data = data.filter((p) => (p.sedeId || null) === sedeFilter);
       }
-      const itemsIn = Array.isArray(body.items) ? body.items : [];
-      if (!itemsIn.length) {
-        json(res, 422, { error: "Agrega al menos un plato al pedido." });
-        return;
-      }
-      const delivery = Boolean(body.delivery);
-      const direccionRaw = body.direccion && typeof body.direccion === "object" ? body.direccion : {};
-      if (delivery) {
-        const calle = normalizarTexto(direccionRaw.calle ?? "");
-        const distrito = normalizarTexto(direccionRaw.distrito ?? "");
-        if (calle.length < 6 || distrito.length < 3) {
-          json(res, 422, {
-            error: "Para delivery indica calle y número (mín. 6 caracteres) y distrito válidos.",
-          });
-          return;
-        }
-      }
-      const paymentMethod = String(body.paymentMethod ?? "");
-      if (!["card", "qr", "cash"].includes(paymentMethod)) {
-        json(res, 422, { error: "Método de pago no válido (card, qr o cash)." });
-        return;
-      }
-      const contactoNombre = normalizarTexto(body.contactoNombre ?? "");
-      const contactoTelefono = String(body.contactoTelefono ?? "").replace(/\D/g, "").slice(0, 9);
-      if (contactoNombre.length < 3 || !/^[0-9]{9}$/.test(contactoTelefono)) {
-        json(res, 422, {
-          error: "Indica nombre de contacto (mín. 3 caracteres) y celular peruano de 9 dígitos para coordinar el pedido.",
-        });
-        return;
-      }
-      let comprobante = null;
-      const compIn = body.comprobante;
-      if (compIn && typeof compIn === "object" && Boolean(compIn.solicita)) {
-        const tipo = String(compIn.tipo ?? "").toLowerCase() === "factura" ? "factura" : "boleta";
-        const num = String(compIn.numeroDocumento ?? "").replace(/\D/g, "");
-        const razon = normalizarTexto(compIn.razonSocial ?? "");
-        if (tipo === "factura") {
-          if (num.length !== 11 || razon.length < 4) {
-            json(res, 422, {
-              error: "Factura (SUNAT): RUC de 11 dígitos y razón social o denominación del receptor son obligatorios.",
-            });
-            return;
-          }
-          comprobante = {
-            tipoSunat: "01",
-            tipo: "factura",
-            numeroDocumento: num,
-            razonSocial: razon.slice(0, 200),
-          };
-        } else {
-          if (num.length !== 8 || razon.length < 4) {
-            json(res, 422, {
-              error: "Boleta (SUNAT): DNI de 8 dígitos y nombre completo del titular son obligatorios.",
-            });
-            return;
-          }
-          comprobante = {
-            tipoSunat: "03",
-            tipo: "boleta",
-            numeroDocumento: num,
-            razonSocial: razon.slice(0, 200),
-          };
-        }
-      }
-      const store = await readStore();
-      ensurePedidosArray(store);
-      const itemsClean = [];
-      let subtotal = 0;
-      for (const row of itemsIn) {
-        const plato = store.platos.find((x) => Number(x.id) === Number(row.platoId));
-        if (!plato) {
-          json(res, 422, { error: `Plato no encontrado: ${row.platoId}` });
-          return;
-        }
-        const unit = parsePrecioSoles(plato.precio);
-        if (unit <= 0 || unit > 500) {
-          json(res, 422, { error: "Precio de plato inválido en catálogo." });
-          return;
-        }
-        const qty = Math.min(20, Math.max(1, Math.floor(Number(row.qty)) || 1));
-        itemsClean.push({
-          platoId: plato.id,
-          nombre: plato.nombre,
-          precioSoles: unit,
-          qty,
-        });
-        subtotal += unit * qty;
-      }
-      const deliverySoles = delivery ? 10 : 0;
-      const total = Math.round((subtotal + deliverySoles) * 100) / 100;
-      const codigoPago = `TR-${Date.now().toString(36).toUpperCase().slice(-5)}${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
-      const qrPayload = `PE|TRES_REGIONES|${codigoPago}|${total.toFixed(2)}|PEN|YAPE_PLIN`;
-      let estado = "Pendiente_caja";
-      if (paymentMethod === "card") estado = "Pagado_simulado_tarjeta";
-      if (paymentMethod === "qr") estado = "Pendiente_confirmacion_QR";
-      const pedido = {
-        id: nextId(store.pedidos),
-        clienteId: Number(p.sub),
-        clienteNombre: String(p.nombre ?? ""),
-        clienteCorreo: String(p.email ?? ""),
-        clienteTelefonoCuenta: String(p.telefono ?? "").replace(/\D/g, "") || null,
-        contactoNombre: contactoNombre.slice(0, 120),
-        contactoTelefono,
-        comprobante,
-        items: itemsClean,
-        delivery,
-        direccion: delivery
-          ? {
-              calle: normalizarTexto(direccionRaw.calle ?? "").slice(0, 160),
-              distrito: normalizarTexto(direccionRaw.distrito ?? "").slice(0, 80),
-              urbanizacion: normalizarTexto(direccionRaw.urbanizacion ?? "").slice(0, 80),
-              referencia: normalizarTexto(direccionRaw.referencia ?? "").slice(0, 200),
-              etiqueta: normalizarTexto(direccionRaw.etiqueta ?? "").slice(0, 240),
-              lat: Number.isFinite(Number(direccionRaw.lat)) ? Number(direccionRaw.lat) : null,
-              lng: Number.isFinite(Number(direccionRaw.lng)) ? Number(direccionRaw.lng) : null,
-              fuente: ["gps", "mapa", "manual"].includes(String(direccionRaw.fuente || "").toLowerCase())
-                ? String(direccionRaw.fuente).toLowerCase()
-                : null,
-            }
-          : null,
-        paymentMethod,
-        cardLast4: paymentMethod === "card" ? String(body.cardLast4 ?? "").replace(/\D/g, "").slice(-4) || null : null,
-        subtotalSoles: subtotal,
-        deliverySoles,
-        totalSoles: total,
-        codigoPago,
-        qrPayload,
-        estado,
-        notasOperacion: "",
-        creadoEn: new Date().toISOString(),
-      };
-      store.pedidos.push(pedido);
-      await writeStore(store);
-      json(res, 201, { data: pedido });
+      json(res, 200, { data });
       return;
     }
 
     const pedidoIdMatch = pathname.match(/^\/api\/pedidos\/(\d+)$/);
     if (pedidoIdMatch && req.method === "PATCH") {
-      if (!requireAdmin(req, res)) return;
+      if (!requireMozoOrAdmin(req, res)) return;
       const id = Number(pedidoIdMatch[1]);
       const body = await readJsonBody(req);
       if (body === "__body_too_large__") {
@@ -827,8 +1106,15 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (!ROLES_CUENTA.has(rol)) {
-        json(res, 422, { error: "Rol no válido (Cliente o Administrador)." });
+        json(res, 422, { error: "Rol no válido." });
         return;
+      }
+      const pinMozo = String(body.pin ?? "").replace(/\D/g, "");
+      if (rol === "Mozo") {
+        if (pinMozo.length < 4 || pinMozo.length > 6) {
+          json(res, 422, { error: "El mozo requiere un PIN de 4 a 6 dígitos." });
+          return;
+        }
       }
       if (!ESTADOS_CUENTA.has(estado)) {
         json(res, 422, { error: "Estado no válido (Activo o Inactivo)." });
@@ -868,6 +1154,14 @@ const server = http.createServer(async (req, res) => {
         nueva.passwordHash = hashPassword(contrasena);
       } else if (rol === "Cliente" && telOk) {
         nueva.passwordHash = hashPassword(telefonoDigits);
+      }
+      if (rol === "Mozo") {
+        nueva.pin = pinMozo;
+        nueva.turno = normalizarTexto(body.turno || "General").slice(0, 40);
+        if (store.cuentas.some((c) => c.rol === "Mozo" && c.pin === pinMozo)) {
+          json(res, 409, { error: "Ya existe un mozo con ese PIN." });
+          return;
+        }
       }
       store.cuentas.push(nueva);
       await writeStore(store);
@@ -1363,6 +1657,700 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // ── Cocina: acceso pantalla KDS ───────────────────────────────────────────
+    if (req.method === "POST" && pathname === "/api/auth/cocina-login") {
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const pin = String(body.pin ?? "").replace(/\D/g, "");
+      if (!pin || pin.length < 4) {
+        json(res, 422, { error: "Ingresa el PIN de cocina (4 dígitos)." });
+        return;
+      }
+      if (pin !== COCINA_PIN) {
+        json(res, 401, { error: "PIN de cocina incorrecto." });
+        return;
+      }
+      const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 12;
+      const token = signAccessToken({ sub: 0, role: "cocina", nombre: "Cocina", exp }, JWT_SECRET);
+      json(res, 200, { token, user: { nombre: "Cocina", rol: "Cocina" } });
+      return;
+    }
+
+    // ── POS: Mozo login ──────────────────────────────────────────────────────
+    if (req.method === "POST" && pathname === "/api/auth/mozo-login") {
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const pin = String(body.pin ?? "").replace(/\D/g, "");
+      if (!pin || pin.length < 4) {
+        json(res, 422, { error: "Ingresa tu PIN de 4 a 6 dígitos." });
+        return;
+      }
+      const store = await readStore();
+      ensureSedesYDelivery(store);
+      const mozo = store.cuentas.find(
+        (c) => c.rol === "Mozo" && c.estado === "Activo" && c.pin === pin,
+      );
+      if (!mozo) {
+        json(res, 401, { error: "PIN incorrecto o mozo no activo." });
+        return;
+      }
+      const sedeIdIn = normalizarTexto(body.sedeId);
+      const sedeMozo = (sedeIdIn && sedeActiva(store, sedeIdIn)) || (store.sedes || []).find((s) => s.activa !== false);
+      const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 12;
+      const token = signAccessToken(
+        { sub: mozo.id, role: "mozo", nombre: mozo.nombre, sedeId: sedeMozo?.id || null, exp },
+        JWT_SECRET,
+      );
+      json(res, 200, {
+        token,
+        user: { id: mozo.id, nombre: mozo.nombre, rol: "Mozo", sedeId: sedeMozo?.id || null, sedeNombre: sedeMozo?.nombre || "" },
+      });
+      return;
+    }
+
+    // ── POS: Estado de mesas ──────────────────────────────────────────────────
+    if (req.method === "GET" && pathname === "/api/mesas-estado") {
+      if (!requireMozoOrAdmin(req, res)) return;
+      const store = await readStore();
+      ensurePedidosArray(store);
+      ensureComandasArray(store);
+      const hoy = new Date().toISOString().slice(0, 10);
+      const result = MESAS.map((m) => {
+        const pedidoAbierto = store.pedidos.find(
+          (p) => p.tipo === "mesa" && p.mesaCodigo === m.codigo && !["Pagado", "Anulado", "Cerrado"].includes(p.estado),
+        );
+        if (pedidoAbierto) {
+          const totalAbierto = (pedidoAbierto.items || []).reduce((s, i) => s + i.precioSoles * i.qty, 0);
+          const rondas = store.comandas.filter((c) => c.pedidoId === pedidoAbierto.id).length;
+          const comandasListas = store.comandas.filter(
+            (c) => c.pedidoId === pedidoAbierto.id && c.estado === "Listo",
+          ).length;
+          return {
+            codigo: m.codigo,
+            zona: m.zona,
+            capacidad: m.capacidad,
+            estado: pedidoAbierto.estado === "Cuenta_pedida" ? "Cuenta_pedida" : "Ocupada",
+            pedidoId: pedidoAbierto.id,
+            mozoNombre: pedidoAbierto.mozoNombre || "",
+            totalAbierto,
+            rondas,
+            comandasListas,
+            abiertaDesde: pedidoAbierto.abiertaEn || pedidoAbierto.creadoEn,
+          };
+        }
+        const reservaHoy = (store.reservas || []).find(
+          (r) => r.mesa === m.codigo && r.fecha === hoy && r.estado === "Confirmada",
+        );
+        if (reservaHoy) {
+          return { codigo: m.codigo, zona: m.zona, capacidad: m.capacidad, estado: "Reservada", reservaCliente: reservaHoy.cliente, reservaHora: reservaHoy.hora };
+        }
+        return { codigo: m.codigo, zona: m.zona, capacidad: m.capacidad, estado: "Libre" };
+      });
+      json(res, 200, { data: result });
+      return;
+    }
+
+    // ── POS: Pedido activo de una mesa ────────────────────────────────────────
+    const mesaPedidoActivoPath = pathname.match(/^\/api\/mesas\/([A-Z0-9]+)\/pedido-activo$/i);
+    if (req.method === "GET" && mesaPedidoActivoPath) {
+      if (!requireMozoOrAdmin(req, res)) return;
+      const codigo = mesaPedidoActivoPath[1].toUpperCase();
+      const store = await readStore();
+      ensurePedidosArray(store);
+      ensureComandasArray(store);
+      const pedido = store.pedidos.find(
+        (p) => p.tipo === "mesa" && p.mesaCodigo === codigo && !["Pagado", "Anulado", "Cerrado"].includes(p.estado),
+      );
+      if (!pedido) { json(res, 200, { data: null }); return; }
+      const comandas = store.comandas.filter((c) => c.pedidoId === pedido.id);
+      json(res, 200, { data: { ...pedido, comandas } });
+      return;
+    }
+
+    // ── POS: Comandas ─────────────────────────────────────────────────────────
+    if (req.method === "GET" && pathname === "/api/comandas") {
+      if (!requireStaff(req, res)) return;
+      const store = await readStore();
+      ensureComandasArray(store);
+      const { searchParams } = parsePath(req.url || "/");
+      let result = [...store.comandas];
+      const estadoFilter = searchParams.get("estado");
+      if (estadoFilter) result = result.filter((c) => c.estado === estadoFilter);
+      const mesaFilter = searchParams.get("mesaCodigo");
+      if (mesaFilter) result = result.filter((c) => c.mesaCodigo === mesaFilter.toUpperCase());
+      const sedeFilterC = searchParams.get("sedeId");
+      if (sedeFilterC) result = result.filter((c) => (c.sedeId || null) === sedeFilterC);
+      json(res, 200, { data: result });
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/comandas") {
+      const auth = requireMozoOrAdmin(req, res);
+      if (!auth) return;
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const mesaCodigo = normalizarTexto(body.mesaCodigo || "").toUpperCase();
+      const mesaMetaPOS = MESAS.find((m) => m.codigo === mesaCodigo);
+      if (!mesaMetaPOS) { json(res, 422, { error: "Mesa no válida." }); return; }
+      const itemsIn = Array.isArray(body.items) ? body.items : [];
+      if (!itemsIn.length) { json(res, 422, { error: "La comanda debe tener al menos un plato." }); return; }
+      const store = await readStore();
+      ensurePedidosArray(store);
+      ensureComandasArray(store);
+      const mozoNombrePOS = auth.role === "mozo" ? String(auth.nombre || "") : "Admin";
+      const mozoIdPOS = auth.role === "mozo" ? Number(auth.sub) : 0;
+      const sedeIdPOS = auth.sedeId || (SEDES_DEFAULT[0]?.id ?? null);
+      let pedido = store.pedidos.find(
+        (p) => p.tipo === "mesa" && p.mesaCodigo === mesaCodigo && !["Pagado", "Anulado", "Cerrado"].includes(p.estado),
+      );
+      if (pedido?.estado === "Cuenta_pedida") {
+        json(res, 422, { error: "La mesa tiene cuenta pedida. No se pueden agregar platos." });
+        return;
+      }
+      const itemsClean = [];
+      for (const row of itemsIn) {
+        const plato = store.platos.find((x) => Number(x.id) === Number(row.platoId));
+        if (!plato) { json(res, 422, { error: `Plato no encontrado: ${row.platoId}` }); return; }
+        const unit = parsePrecioSoles(plato.precio);
+        if (unit <= 0) { json(res, 422, { error: "Precio de plato inválido." }); return; }
+        const qty = Math.min(20, Math.max(1, Math.floor(Number(row.qty)) || 1));
+        const notas = normalizarTexto(row.notas || "").slice(0, 200);
+        itemsClean.push({ platoId: plato.id, nombre: plato.nombre, precioSoles: unit, qty, notas });
+      }
+      if (!pedido) {
+        pedido = {
+          id: nextId(store.pedidos),
+          tipo: "mesa",
+          mesaCodigo,
+          sedeId: sedeIdPOS,
+          mozoId: mozoIdPOS,
+          mozoNombre: mozoNombrePOS,
+          items: [],
+          paymentMethod: null,
+          subtotalSoles: 0,
+          totalSoles: 0,
+          codigoPago: null,
+          qrPayload: null,
+          comprobante: null,
+          estado: "Ocupada",
+          notasOperacion: "",
+          abiertaEn: new Date().toISOString(),
+          creadoEn: new Date().toISOString(),
+        };
+        store.pedidos.push(pedido);
+      }
+      for (const item of itemsClean) {
+        const existing = pedido.items.find((x) => x.platoId === item.platoId && x.notas === item.notas);
+        if (existing) {
+          existing.qty = Math.min(20, existing.qty + item.qty);
+        } else {
+          pedido.items.push({ ...item });
+        }
+      }
+      pedido.subtotalSoles = pedido.items.reduce((s, i) => s + i.precioSoles * i.qty, 0);
+      pedido.totalSoles = pedido.subtotalSoles;
+      const rondaActual = store.comandas.filter((c) => c.pedidoId === pedido.id).length + 1;
+      const comanda = {
+        id: nextId(store.comandas),
+        mesaCodigo,
+        pedidoId: pedido.id,
+        sedeId: pedido.sedeId || sedeIdPOS,
+        origen: "mesa",
+        ronda: rondaActual,
+        mozoId: mozoIdPOS,
+        mozoNombre: mozoNombrePOS,
+        items: itemsClean,
+        estado: "Pendiente_cocina",
+        creadoEn: new Date().toISOString(),
+        listoEn: null,
+      };
+      store.comandas.push(comanda);
+      const pidx = store.pedidos.findIndex((p) => p.id === pedido.id);
+      if (pidx !== -1) store.pedidos[pidx] = pedido;
+      await writeStore(store);
+      json(res, 201, { data: comanda, pedido });
+      return;
+    }
+
+    const comandaIdPath = pathname.match(/^\/api\/comandas\/(\d+)$/);
+    if (req.method === "PATCH" && comandaIdPath) {
+      const authComanda = requireStaff(req, res);
+      if (!authComanda) return;
+      const id = Number(comandaIdPath[1]);
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const store = await readStore();
+      ensureComandasArray(store);
+      const idx = store.comandas.findIndex((c) => c.id === id);
+      if (idx === -1) { json(res, 404, { error: "Comanda no encontrada." }); return; }
+      const estadosComanda = new Set(["Pendiente_cocina", "En_preparacion", "Listo", "Servido"]);
+      if (body.estado !== undefined) {
+        if (!estadosComanda.has(body.estado)) { json(res, 422, { error: "Estado de comanda no válido." }); return; }
+        const nuevo = body.estado;
+        if (nuevo === "Servido" && authComanda.role === "cocina") {
+          json(res, 403, { error: "Solo el mozo puede marcar como servido." });
+          return;
+        }
+        if (["En_preparacion", "Listo"].includes(nuevo) && authComanda.role === "mozo") {
+          json(res, 403, { error: "Solo cocina puede actualizar preparación." });
+          return;
+        }
+        store.comandas[idx].estado = nuevo;
+        if (nuevo === "Listo") store.comandas[idx].listoEn = new Date().toISOString();
+        if (nuevo === "Servido") store.comandas[idx].servidoEn = new Date().toISOString();
+      }
+      await writeStore(store);
+      json(res, 200, { data: store.comandas[idx] });
+      return;
+    }
+
+    // ── POS: Cerrar cuenta / pago de mesa ─────────────────────────────────────
+    if (req.method === "POST" && pathname === "/api/pedidos-mesa") {
+      const auth = requireMozoOrAdmin(req, res);
+      if (!auth) return;
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const mesaCodigoPM = normalizarTexto(body.mesaCodigo || "").toUpperCase();
+      if (!MESAS.find((m) => m.codigo === mesaCodigoPM)) {
+        json(res, 422, { error: "Mesa no válida." });
+        return;
+      }
+      const paymentMethodPM = String(body.paymentMethod ?? "");
+      if (!["card", "qr", "cash"].includes(paymentMethodPM)) {
+        json(res, 422, { error: "Método de pago no válido (card, qr o cash)." });
+        return;
+      }
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const pedidoIdx = store.pedidos.findIndex(
+        (p) => p.tipo === "mesa" && p.mesaCodigo === mesaCodigoPM && !["Pagado", "Anulado", "Cerrado"].includes(p.estado),
+      );
+      if (pedidoIdx === -1) { json(res, 404, { error: "No hay pedido abierto para esta mesa." }); return; }
+      const pedidoPM = store.pedidos[pedidoIdx];
+      const total = pedidoPM.subtotalSoles || 0;
+      const codigoPagoPM = `TR-${Date.now().toString(36).toUpperCase().slice(-5)}${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+      const qrPayloadPM = `PE|TRES_REGIONES|${codigoPagoPM}|${total.toFixed(2)}|PEN|YAPE_PLIN`;
+      let comprobantePM = null;
+      const compInPM = body.comprobante;
+      if (compInPM && typeof compInPM === "object" && Boolean(compInPM.solicita)) {
+        const tipoPM = String(compInPM.tipo ?? "").toLowerCase() === "factura" ? "factura" : "boleta";
+        const numPM = String(compInPM.numeroDocumento ?? "").replace(/\D/g, "");
+        const razonPM = normalizarTexto(compInPM.razonSocial ?? "");
+        if (tipoPM === "factura") {
+          if (numPM.length !== 11 || razonPM.length < 4) {
+            json(res, 422, { error: "Factura (SUNAT): RUC de 11 dígitos y razón social obligatorios." });
+            return;
+          }
+          comprobantePM = { tipoSunat: "01", tipo: "factura", numeroDocumento: numPM, razonSocial: razonPM.slice(0, 200) };
+        } else {
+          if (numPM.length !== 8 || razonPM.length < 4) {
+            json(res, 422, { error: "Boleta (SUNAT): DNI de 8 dígitos y nombre completo obligatorios." });
+            return;
+          }
+          comprobantePM = { tipoSunat: "03", tipo: "boleta", numeroDocumento: numPM, razonSocial: razonPM.slice(0, 200) };
+        }
+      }
+      store.pedidos[pedidoIdx] = {
+        ...pedidoPM,
+        estado: "Pagado",
+        paymentMethod: paymentMethodPM,
+        cardLast4: paymentMethodPM === "card" ? String(body.cardLast4 ?? "").replace(/\D/g, "").slice(-4) || null : null,
+        codigoPago: codigoPagoPM,
+        qrPayload: qrPayloadPM,
+        comprobante: comprobantePM,
+        subtotalSoles: total,
+        totalSoles: total,
+        pagadoEn: new Date().toISOString(),
+      };
+      await writeStore(store);
+      json(res, 200, { data: store.pedidos[pedidoIdx] });
+      return;
+    }
+
+    // ── POS: Menú del día ─────────────────────────────────────────────────────
+    if (req.method === "GET" && pathname === "/api/menu-del-dia") {
+      const store = await readStore();
+      ensureMenuDelDia(store);
+      json(res, 200, { data: store.menuDelDia });
+      return;
+    }
+
+    if (req.method === "PATCH" && pathname === "/api/menu-del-dia") {
+      if (!requireAdmin(req, res)) return;
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const store = await readStore();
+      ensureMenuDelDia(store);
+      if (body.activo !== undefined) store.menuDelDia.activo = Boolean(body.activo);
+      if (body.fecha !== undefined) store.menuDelDia.fecha = normalizarTexto(body.fecha).slice(0, 10);
+      if (body.precioSoles !== undefined) {
+        const p = Number(body.precioSoles);
+        if (Number.isFinite(p) && p >= 0 && p <= 500) store.menuDelDia.precioSoles = p;
+      }
+      if (body.entrada !== undefined) store.menuDelDia.entrada = normalizarTexto(body.entrada).slice(0, 120);
+      if (body.fondo !== undefined) store.menuDelDia.fondo = normalizarTexto(body.fondo).slice(0, 120);
+      if (body.bebida !== undefined) store.menuDelDia.bebida = normalizarTexto(body.bebida).slice(0, 80);
+      if (body.descripcion !== undefined) store.menuDelDia.descripcion = normalizarTexto(body.descripcion).slice(0, 300);
+      await writeStore(store);
+      json(res, 200, { data: store.menuDelDia });
+      return;
+    }
+
+    // ── POS: Cierre de caja diario (mesa + delivery, por sede) ────────────────
+    if (req.method === "GET" && pathname === "/api/cierre-caja") {
+      if (!requireAdmin(req, res)) return;
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const { searchParams } = parsePath(req.url || "/");
+      const fechaCierre = normalizarTexto(searchParams.get("fecha") || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
+      const sedeFilter = normalizarTexto(searchParams.get("sedeId"));
+      const pagadosHoy = store.pedidos.filter((p) => {
+        const cobrado =
+          (p.tipo === "mesa" && p.estado === "Pagado") || (p.tipo === "delivery" && p.pagado === true);
+        if (!cobrado) return false;
+        if (String(p.pagadoEn || "").slice(0, 10) !== fechaCierre) return false;
+        if (sedeFilter && (p.sedeId || null) !== sedeFilter) return false;
+        return true;
+      });
+      const totalEfectivo = pagadosHoy.filter((p) => p.paymentMethod === "cash").reduce((s, p) => s + (p.totalSoles || 0), 0);
+      const totalYape = pagadosHoy.filter((p) => p.paymentMethod === "qr").reduce((s, p) => s + (p.totalSoles || 0), 0);
+      const totalTarjeta = pagadosHoy.filter((p) => p.paymentMethod === "card").reduce((s, p) => s + (p.totalSoles || 0), 0);
+      const totalGeneral = totalEfectivo + totalYape + totalTarjeta;
+      json(res, 200, {
+        data: {
+          fecha: fechaCierre,
+          sedeId: sedeFilter || null,
+          mesas: pagadosHoy.filter((p) => p.tipo === "mesa").length,
+          deliveries: pagadosHoy.filter((p) => p.tipo === "delivery").length,
+          totalGeneral: Math.round(totalGeneral * 100) / 100,
+          efectivo: Math.round(totalEfectivo * 100) / 100,
+          yapeQR: Math.round(totalYape * 100) / 100,
+          tarjeta: Math.round(totalTarjeta * 100) / 100,
+          pedidos: pagadosHoy,
+        },
+      });
+      return;
+    }
+
+    // ── Delivery / catálogo comercial ─────────────────────────────────────────
+    if (req.method === "GET" && pathname === "/api/stats/public") {
+      const store = await readStore();
+      ensureSedesYDelivery(store);
+      json(res, 200, { data: computePublicStats(store) });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/sedes") {
+      const store = await readStore();
+      ensureSedesYDelivery(store);
+      json(res, 200, { data: (store.sedes || []).filter((s) => s.activa !== false) });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/zonas-delivery") {
+      const store = await readStore();
+      ensureSedesYDelivery(store);
+      json(res, 200, { data: (store.zonasDelivery || []).filter((z) => z.activa !== false) });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/promociones") {
+      const store = await readStore();
+      ensureSedesYDelivery(store);
+      json(res, 200, { data: (store.promociones || []).filter((p) => p.activa !== false) });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/combos") {
+      const store = await readStore();
+      ensureSedesYDelivery(store);
+      json(res, 200, { data: (store.combos || []).filter((c) => c.activa !== false) });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/geo/reverse") {
+      const { searchParams } = parsePath(req.url || "/");
+      const lat = Number(searchParams.get("lat"));
+      const lng = Number(searchParams.get("lng"));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        json(res, 422, { error: "Coordenadas inválidas." });
+        return;
+      }
+      if (geoThrottle(requestIp(req), "reverse")) {
+        json(res, 429, { error: "Espera un momento antes de volver a ubicarte." });
+        return;
+      }
+      try {
+        const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
+        const data = await nominatimFetchJson(url);
+        const dir = direccionDesdeNominatimPlace(data);
+        const store = await readStore();
+        ensureSedesYDelivery(store);
+        const zona = zonaPorDistrito(store, dir.distrito);
+        json(res, 200, {
+          data: {
+            ...dir,
+            cobertura: Boolean(zona),
+            sedeId: zona?.sedeId || null,
+            deliverySoles: zona?.costoSoles ?? null,
+          },
+        });
+      } catch {
+        json(res, 502, { error: "No pudimos ubicar tu dirección. Elige tu distrito manualmente." });
+      }
+      return;
+    }
+
+    // ── Delivery: crear pedido (cliente autenticado) ──────────────────────────
+    if (req.method === "POST" && pathname === "/api/pedidos-delivery") {
+      const auth = requireClient(req, res);
+      if (!auth) return;
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__") {
+        json(res, 413, { error: "El payload excede el tamaño máximo permitido." });
+        return;
+      }
+      if (!body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const itemsIn = Array.isArray(body.items) ? body.items : [];
+      if (!itemsIn.length) {
+        json(res, 422, { error: "Tu pedido debe tener al menos un plato." });
+        return;
+      }
+      const dir = body.direccion && typeof body.direccion === "object" ? body.direccion : {};
+      const calle = normalizarTexto(dir.calle);
+      const distrito = normalizarTexto(dir.distrito);
+      const referencia = normalizarTexto(body.referencia || dir.referencia);
+      const celularContacto = String(body.celularContacto ?? "").replace(/\D/g, "").slice(0, 9);
+      if (calle.length < 4) {
+        json(res, 422, { error: "Indica la dirección de entrega (calle y número)." });
+        return;
+      }
+      if (referencia.length < 3) {
+        json(res, 422, { error: "Agrega una referencia para que el repartidor te ubique." });
+        return;
+      }
+      if (celularContacto.length !== 9) {
+        json(res, 422, { error: "Indica un celular de contacto de 9 dígitos." });
+        return;
+      }
+      const paymentMethod = String(body.paymentMethod ?? "");
+      if (!["card", "qr", "cash"].includes(paymentMethod)) {
+        json(res, 422, { error: "Método de pago no válido (card, qr o cash)." });
+        return;
+      }
+      const store = await readStore();
+      ensurePedidosArray(store);
+      ensureComandasArray(store);
+      ensureSedesYDelivery(store);
+      const zona = zonaPorDistrito(store, distrito);
+      if (!zona) {
+        json(res, 400, {
+          error: "Aún no llegamos a ese distrito. Elige Los Olivos, San Martín de Porres o Comas.",
+        });
+        return;
+      }
+      const sedeIdElegida = normalizarTexto(body.sedeId);
+      const sede =
+        (sedeIdElegida && sedeActiva(store, sedeIdElegida)) || sedeActiva(store, zona.sedeId);
+      if (!sede) {
+        json(res, 400, { error: "No hay una sede disponible para tu zona en este momento." });
+        return;
+      }
+      const itemsClean = [];
+      const cocinaItems = [];
+      for (const row of itemsIn) {
+        const qty = Math.min(20, Math.max(1, Math.floor(Number(row.qty)) || 1));
+        if (row.comboId != null) {
+          const combo = (store.combos || []).find((c) => Number(c.id) === Number(row.comboId) && c.activa !== false);
+          if (!combo) {
+            json(res, 422, { error: `Combo no encontrado: ${row.comboId}` });
+            return;
+          }
+          const precioCombo = Number(combo.precioCombo) || 0;
+          if (precioCombo <= 0) {
+            json(res, 422, { error: "Precio de combo inválido." });
+            return;
+          }
+          itemsClean.push({ comboId: combo.id, nombre: combo.nombre, precioSoles: precioCombo, qty, notas: "" });
+          for (const ci of combo.items || []) {
+            const cp = store.platos.find((x) => Number(x.id) === Number(ci.platoId));
+            if (cp) {
+              cocinaItems.push({
+                platoId: cp.id,
+                nombre: cp.nombre,
+                precioSoles: parsePrecioSoles(cp.precio),
+                qty: qty * (Number(ci.qty) || 1),
+                notas: `Combo: ${combo.nombre}`,
+              });
+            }
+          }
+          continue;
+        }
+        const plato = store.platos.find((x) => Number(x.id) === Number(row.platoId));
+        if (!plato) {
+          json(res, 422, { error: `Plato no encontrado: ${row.platoId}` });
+          return;
+        }
+        const unit = parsePrecioSoles(plato.precio);
+        if (unit <= 0) {
+          json(res, 422, { error: "Precio de plato inválido." });
+          return;
+        }
+        const notas = normalizarTexto(row.notas || "").slice(0, 200);
+        const linea = { platoId: plato.id, nombre: plato.nombre, precioSoles: unit, qty, notas };
+        itemsClean.push(linea);
+        cocinaItems.push({ ...linea });
+      }
+      const subtotalSoles = itemsClean.reduce((s, i) => s + i.precioSoles * i.qty, 0);
+      const deliverySoles = Number(zona.costoSoles) || 0;
+      const totalSoles = subtotalSoles + deliverySoles;
+      const eta = calcularEta(store, sede.id, zona);
+      const codigoPago = `TR-DLV-${Date.now().toString(36).toUpperCase().slice(-5)}${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+      const qrPayload = `PE|TRES_REGIONES|${codigoPago}|${totalSoles.toFixed(2)}|PEN|YAPE_PLIN`;
+      const pagado = paymentMethod !== "cash";
+      const ahora = new Date().toISOString();
+      const repartidor = pickRepartidor(store, sede.id);
+      const pedido = {
+        id: nextId(store.pedidos),
+        tipo: "delivery",
+        sedeId: sede.id,
+        sedeNombre: sede.nombre,
+        repartidor,
+        clienteId: Number(auth.sub) || null,
+        clienteNombre: String(auth.nombre || "Cliente"),
+        items: itemsClean,
+        direccion: { calle: calle.slice(0, 160), distrito: zona.distrito, referencia: referencia.slice(0, 200) },
+        celularContacto,
+        paymentMethod,
+        pagado,
+        cardLast4: paymentMethod === "card" ? String(body.cardLast4 ?? "").replace(/\D/g, "").slice(-4) || null : null,
+        codigoPago,
+        qrPayload,
+        subtotalSoles,
+        deliverySoles,
+        totalSoles,
+        etaMin: eta.etaMin,
+        etaMax: eta.etaMax,
+        etaTexto: eta.etaTexto,
+        estado: "Recibido",
+        creadoEn: ahora,
+        pagadoEn: pagado ? ahora : null,
+        entregadoEn: null,
+      };
+      store.pedidos.push(pedido);
+      const comanda = {
+        id: nextId(store.comandas),
+        mesaCodigo: `D-${pedido.id}`,
+        pedidoId: pedido.id,
+        sedeId: sede.id,
+        origen: "delivery",
+        ronda: 1,
+        mozoId: 0,
+        mozoNombre: "Delivery",
+        items: cocinaItems,
+        estado: "Pendiente_cocina",
+        creadoEn: ahora,
+        listoEn: null,
+      };
+      store.comandas.push(comanda);
+      await writeStore(store);
+      json(res, 201, { data: pedido });
+      return;
+    }
+
+    if (req.method === "GET" && pathname === "/api/mis-pedidos") {
+      const auth = requireClient(req, res);
+      if (!auth) return;
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const mios = store.pedidos
+        .filter((p) => p.tipo === "delivery" && Number(p.clienteId) === Number(auth.sub))
+        .sort((a, b) => (a.creadoEn > b.creadoEn ? -1 : 1));
+      json(res, 200, { data: mios });
+      return;
+    }
+
+    const pedidoDeliveryIdMatch = pathname.match(/^\/api\/pedidos-delivery\/(\d+)$/);
+    if (pedidoDeliveryIdMatch && req.method === "GET") {
+      const auth = authPayload(req);
+      if (!auth) {
+        json(res, 401, { error: "Se requiere sesión." });
+        return;
+      }
+      const id = Number(pedidoDeliveryIdMatch[1]);
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const pedido = store.pedidos.find((p) => Number(p.id) === id && p.tipo === "delivery");
+      if (!pedido) {
+        json(res, 404, { error: "Pedido no encontrado." });
+        return;
+      }
+      const esDueno = auth.role === "client" && Number(pedido.clienteId) === Number(auth.sub);
+      if (!esDueno && auth.role !== "admin") {
+        json(res, 403, { error: "No puedes ver este pedido." });
+        return;
+      }
+      json(res, 200, { data: pedido });
+      return;
+    }
+
+    if (pedidoDeliveryIdMatch && req.method === "PATCH") {
+      if (!requireMozoOrAdmin(req, res)) return;
+      const id = Number(pedidoDeliveryIdMatch[1]);
+      const body = await readJsonBody(req);
+      if (body === "__body_too_large__" || !body || typeof body !== "object") {
+        json(res, 400, { error: "JSON inválido" });
+        return;
+      }
+      const store = await readStore();
+      ensurePedidosArray(store);
+      const idx = store.pedidos.findIndex((p) => Number(p.id) === id && p.tipo === "delivery");
+      if (idx === -1) {
+        json(res, 404, { error: "Pedido no encontrado." });
+        return;
+      }
+      const cur = store.pedidos[idx];
+      const next = { ...cur };
+      const estado = normalizarTexto(body.estado);
+      if (!ESTADOS_DELIVERY.has(estado)) {
+        json(res, 422, { error: "Estado de delivery no válido." });
+        return;
+      }
+      next.estado = estado;
+      if (estado === "Entregado") {
+        next.entregadoEn = new Date().toISOString();
+        if (!next.pagado) {
+          next.pagado = true;
+          next.pagadoEn = next.pagadoEn || new Date().toISOString();
+        }
+      }
+      store.pedidos[idx] = next;
+      await writeStore(store);
+      json(res, 200, { data: next });
+      return;
+    }
+
     if (await tryServeStatic(req, res, pathname)) {
       return;
     }
@@ -1382,6 +2370,15 @@ await ensureDataFile();
   const store = await readStore();
   let dirty = migrateCuentasClienteTelefono(store);
   if (migrateReservasCampos(store)) dirty = true;
+  if (migrateMozosDemo(store)) dirty = true;
+  if (migratePlatosDisponible(store)) dirty = true;
+  if (migrateOperacionDual(store)) dirty = true;
+  if (ensureSedesYDelivery(store)) dirty = true;
+  if (ensureClienteDemo(store)) dirty = true;
+  if (ensureDemoDeliveries(store)) dirty = true;
+  ensureComandasArray(store);
+  ensureMenuDelDia(store);
+  if (!store.comandas || !store.menuDelDia) dirty = true;
   if (dirty) {
     await writeStore(store);
   }
