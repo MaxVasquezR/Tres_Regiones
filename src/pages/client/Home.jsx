@@ -9,17 +9,17 @@ import { useCart } from "../../context/CartContext";
 
 const HERO_SLIDES = [
   {
-    image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=2200&q=82",
+    image: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=960&q=72",
     headline: ["Comida peruana", "más rápida del mundo"],
     sub: "Delivery Guepardo en ~28 minutos. Costa, sierra y selva, recién hecho, en tu puerta.",
   },
   {
-    image: "https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=2200&q=82",
+    image: "https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=960&q=72",
     headline: ["Combos que vuelan", "a tu mesa o tu casa"],
     sub: "Arma tu pedido en un clic y sigue al Guepardo en vivo hasta tu puerta.",
   },
   {
-    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=2200&q=82",
+    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=960&q=72",
     headline: ["Tres sedes", "en Lima Norte"],
     sub: "Los Olivos, San Martín de Porres y Comas. Pide a domicilio o reserva tu mesa.",
   },
@@ -128,7 +128,6 @@ export default function Home() {
   const [modalPlato, setModalPlato] = useState(null);
   const [, setSesionTick] = useState(0);
   const [sedes, setSedes] = useState([]);
-  const [promos, setPromos] = useState([]);
   const [combos, setCombos] = useState([]);
   const location = useLocation();
   const navigate = useNavigate();
@@ -192,15 +191,13 @@ export default function Home() {
     let cancelled = false;
     (async () => {
       try {
-        const [s, p, c] = await Promise.all([
+        const [s, c] = await Promise.all([
           apiGet("/api/sedes").catch(() => ({ data: [] })),
-          apiGet("/api/promociones").catch(() => ({ data: [] })),
           apiGet("/api/combos").catch(() => ({ data: [] })),
         ]);
         if (cancelled) return;
         const sedesData = Array.isArray(s.data) ? s.data : [];
         setSedes(sedesData);
-        setPromos(Array.isArray(p.data) ? p.data : []);
         setCombos(Array.isArray(c.data) ? c.data : []);
         if (!sedeId && sedesData[0]) setSede(sedesData[0].id);
       } catch {
@@ -236,7 +233,7 @@ export default function Home() {
   };
 
   return (
-    <div className="home home--flow">
+    <div className="home home--flow home--speed">
       {modalPlato && (
         <PlatoModal plato={modalPlato} onClose={() => setModalPlato(null)} onAdd={addPlato} />
       )}
@@ -270,7 +267,7 @@ export default function Home() {
                 Reservar mesa
               </Link>
             </div>
-            <div className="hero__stats" aria-label="Datos del restaurante">
+            <div className="hero__stats hero__stats--desktop" aria-label="Datos del restaurante">
               {HIGHLIGHTS.map((h) => (
                 <article key={h.label} className="hero__stat">
                   <span className="hero__stat-icon" aria-hidden>
@@ -330,33 +327,96 @@ export default function Home() {
         </section>
       )}
 
-      {/* ── PROMOCIONES DE LA SEMANA ── */}
-      {promos.length > 0 && (
-        <section className="surface-band surface-band--paper reveal" aria-labelledby="promos-heading">
-          <div className="container container--wide">
-            <div className="section-heading" style={{ marginBottom: "clamp(20px, 3vw, 32px)" }}>
-              <p className="eyebrow">Promociones de la semana</p>
-              <h2 id="promos-heading" className="section-title section-title--gradient">
-                Ofertas que vuelan ⚡
+      {/* ── CARTA / MENÚ (prioridad móvil) ── */}
+      <section className="surface-band surface-band--mist home-carta" id="carta" aria-labelledby="menu-heading">
+        <div className="container container--wide">
+          <div className="menu-section">
+            <div className="section-heading reveal">
+              <p className="eyebrow">Carta · tres regiones</p>
+              <h2 id="menu-heading" className="section-title section-title--gradient">
+                {nombreCliente ? `${nombreCliente}, pide ya` : "Pide ya ⚡"}
               </h2>
+              <p className="section-lead home-carta__lead">
+                Toca + Agregar y listo. Delivery Guepardo en ~28 min.
+              </p>
             </div>
-            <div className="promos-grid">
-              {promos.map((p) => (
-                <article key={p.id} className="promo-card card lift">
-                  <div className="promo-card__img" style={{ backgroundImage: `url(${p.imagen})` }}>
-                    {p.descuentoPct ? <span className="promo-card__badge">-{p.descuentoPct}%</span> : null}
-                  </div>
-                  <div className="promo-card__body">
-                    <h3 className="promo-card__title">{p.titulo}</h3>
-                    <p className="promo-card__desc">{p.descripcion}</p>
-                    <a href="#carta" className="btn btn--outline-dark btn--sm">Pedir ahora</a>
-                  </div>
-                </article>
+
+            <div className="filter-pills reveal" role="group" aria-label="Filtrar por categoría">
+              {CATEGORIAS.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`filter-pill${activeFilter === cat ? " filter-pill--active" : ""}`}
+                  onClick={() => setActiveFilter(cat)}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
+
+            {platosLoading ? (
+              <SkeletonPlatos />
+            ) : platosFiltered.length === 0 ? (
+              <p className="section-lead" style={{ textAlign: "center", paddingBlock: 32 }}>
+                Sin platos en esta categoría.
+              </p>
+            ) : (
+              <div className="menu-grid">
+                {platosFiltered.map((plato) => (
+                  <article key={plato.id} className="menu-card card lift reveal">
+                    <div className="menu-card__img-wrap">
+                      <img
+                        src={plato.imagen}
+                        alt={plato.nombre}
+                        className="menu-card__image"
+                        loading="lazy"
+                        decoding="async"
+                        onClick={() => setModalPlato(plato)}
+                        style={{ cursor: "pointer" }}
+                      />
+                      {plato.categoria && (
+                        <span
+                          className="menu-card__badge"
+                          style={{ background: CATEGORIA_COLOR[plato.categoria] || "var(--brand-700)" }}
+                        >
+                          {plato.categoria}
+                        </span>
+                      )}
+                    </div>
+                    <div className="menu-card__body">
+                      <h3
+                        className="menu-card__name"
+                        onClick={() => setModalPlato(plato)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {plato.nombre}
+                      </h3>
+                      <p className="menu-card__description">{plato.descripcion}</p>
+                      <strong className="menu-card__price">{plato.precio}</strong>
+                      <div className="menu-card__actions menu-card__actions--split">
+                        <button
+                          type="button"
+                          className="btn btn--outline-dark menu-card__btn"
+                          onClick={() => setModalPlato(plato)}
+                        >
+                          Ver
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--primary menu-card__btn"
+                          onClick={() => addPlato(plato, 1, "")}
+                        >
+                          + Agregar
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* ── COMBOS ── */}
       {combos.length > 0 && (
@@ -392,6 +452,7 @@ export default function Home() {
         </section>
       )}
 
+      <div className="home-deferred">
       {/* ── HISTORIA ── */}
       <section className="surface-band reveal" aria-labelledby="historia-heading">
         <div className="container container--wide historia-section">
@@ -491,96 +552,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── CARTA / MENÚ ── */}
-      <section className="surface-band surface-band--mist" id="carta" aria-labelledby="menu-heading">
-        <div className="container container--wide">
-          <div className="menu-section">
-            <div className="section-heading reveal">
-              <p className="eyebrow">Carta · tres regiones</p>
-              <h2 id="menu-heading" className="section-title section-title--gradient">
-                {nombreCliente ? `${nombreCliente}, nuestra carta` : "Nuestra carta"}
-              </h2>
-              <p className="section-lead">
-                Pide a domicilio con delivery Guepardo o resérvala para disfrutar en sala. Agrega tus platos al carrito.
-              </p>
-            </div>
-
-            <div className="filter-pills reveal" role="group" aria-label="Filtrar por categoría">
-              {CATEGORIAS.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  className={`filter-pill${activeFilter === cat ? " filter-pill--active" : ""}`}
-                  onClick={() => setActiveFilter(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
-            {platosLoading ? (
-              <SkeletonPlatos />
-            ) : platosFiltered.length === 0 ? (
-              <p className="section-lead" style={{ textAlign: "center", paddingBlock: 32 }}>
-                Sin platos en esta categoría.
-              </p>
-            ) : (
-              <div className="menu-grid">
-                {platosFiltered.map((plato) => (
-                  <article key={plato.id} className="menu-card card lift reveal">
-                    <div className="menu-card__img-wrap">
-                      <img
-                        src={plato.imagen}
-                        alt={plato.nombre}
-                        className="menu-card__image"
-                        loading="lazy"
-                        onClick={() => setModalPlato(plato)}
-                        style={{ cursor: "pointer" }}
-                      />
-                      {plato.categoria && (
-                        <span
-                          className="menu-card__badge"
-                          style={{ background: CATEGORIA_COLOR[plato.categoria] || "var(--brand-700)" }}
-                        >
-                          {plato.categoria}
-                        </span>
-                      )}
-                    </div>
-                    <div className="menu-card__body">
-                      <h3
-                        className="menu-card__name"
-                        onClick={() => setModalPlato(plato)}
-                        style={{ cursor: "pointer" }}
-                      >
-                        {plato.nombre}
-                      </h3>
-                      <p className="menu-card__description">{plato.descripcion}</p>
-                      <strong className="menu-card__price">{plato.precio}</strong>
-                      <div className="menu-card__actions menu-card__actions--split">
-                        <button
-                          type="button"
-                          className="btn btn--outline-dark menu-card__btn"
-                          onClick={() => setModalPlato(plato)}
-                        >
-                          Ver
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--primary menu-card__btn"
-                          onClick={() => addPlato(plato, 1, "")}
-                        >
-                          + Agregar
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
       {/* ── GALERÍA ── */}
       <section className="surface-band surface-band--paper reveal" aria-label="Galería de platos">
         <div className="container container--wide">
@@ -647,6 +618,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      </div>
 
       {count > 0 && (
         <button

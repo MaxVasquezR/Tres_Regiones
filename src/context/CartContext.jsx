@@ -2,12 +2,6 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 const STORAGE_KEY = "tr_cart_v1";
 
-const PROMOS_VALIDOS = {
-  GUEPARDO: { pct: 10, label: "Guepardo -10%" },
-  VELOZ28: { pct: 5, label: "Entrega veloz -5%" },
-  REGIONES: { pct: 15, label: "Tres Regiones -15%", maxSoles: 35 },
-};
-
 const CartContext = createContext(null);
 
 function parsePrecio(v) {
@@ -23,24 +17,21 @@ function readState() {
       return {
         items: Array.isArray(parsed.items) ? parsed.items : [],
         sedeId: typeof parsed.sedeId === "string" ? parsed.sedeId : null,
-        promoCode: typeof parsed.promoCode === "string" ? parsed.promoCode : "",
       };
     }
   } catch {
     /* ignore */
   }
-  return { items: [], sedeId: null, promoCode: "" };
+  return { items: [], sedeId: null };
 }
 
 export function CartProvider({ children }) {
   const initial = readState();
   const [items, setItems] = useState(initial.items);
   const [sedeId, setSedeId] = useState(initial.sedeId);
-  const [promoCode, setPromoCode] = useState(initial.promoCode || "");
-
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, sedeId, promoCode }));
-  }, [items, sedeId, promoCode]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ items, sedeId }));
+  }, [items, sedeId]);
 
   const addPlato = useCallback((plato, qty = 1, notas = "") => {
     const key = `p:${plato.id}:${notas}`;
@@ -108,42 +99,10 @@ export function CartProvider({ children }) {
   const subtotal = useMemo(() => items.reduce((s, x) => s + x.precioSoles * x.qty, 0), [items]);
   const count = useMemo(() => items.reduce((s, x) => s + x.qty, 0), [items]);
 
-  const promo = useMemo(() => {
-    const key = String(promoCode || "")
-      .trim()
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-    return PROMOS_VALIDOS[key] ? { code: key, ...PROMOS_VALIDOS[key] } : null;
-  }, [promoCode]);
-
-  const descuentoSoles = useMemo(() => {
-    if (!promo || subtotal <= 0) return 0;
-    let d = Math.round(subtotal * (promo.pct / 100) * 100) / 100;
-    if (promo.maxSoles != null) d = Math.min(d, promo.maxSoles);
-    return d;
-  }, [promo, subtotal]);
-
-  const applyPromo = useCallback((code) => {
-    const key = String(code || "")
-      .trim()
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-    if (!PROMOS_VALIDOS[key]) return { ok: false, error: "Código no válido. Prueba GUEPARDO, VELOZ28 o REGIONES." };
-    setPromoCode(key);
-    return { ok: true, promo: PROMOS_VALIDOS[key] };
-  }, []);
-
-  const clearPromo = useCallback(() => setPromoCode(""), []);
-
   const value = {
     items,
     sedeId,
     subtotal,
-    descuentoSoles,
-    promo,
-    promoCode,
-    applyPromo,
-    clearPromo,
     count,
     addPlato,
     addCombo,

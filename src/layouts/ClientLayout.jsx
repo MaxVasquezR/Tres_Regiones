@@ -112,7 +112,7 @@ export default function ClientLayout() {
       )}
 
       {!authRoute && logueado && (
-        <div className="guepardo-vip full-bleed" role="note">
+        <div className="guepardo-vip guepardo-vip--optional full-bleed" role="note">
           <div className="container container--wide guepardo-vip__inner">
             <span className="guepardo-vip__icon" aria-hidden>🐆</span>
             <p className="guepardo-vip__text">

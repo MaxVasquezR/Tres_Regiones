@@ -86,7 +86,7 @@ export default function Login() {
 
           <ul className="auth-split__bullets auth-gate-hero__bullets">
             <li>Sigue tu pedido en vivo: cocina, salida y Guepardo en camino con tu repartidor asignado.</li>
-            <li>Combos y promociones de la semana para pedir en un clic.</li>
+            <li>Combos y carta para pedir en un clic.</li>
             <li>¿Prefieres venir? También reservas tu mesa desde aquí.</li>
           </ul>
 

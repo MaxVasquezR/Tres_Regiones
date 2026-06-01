@@ -1,24 +1,11 @@
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../../context/CartContext";
 
 export default function Carrito() {
-  const { items, subtotal, descuentoSoles, promo, applyPromo, clearPromo, setQty, removeItem, clear } = useCart();
+  const { items, subtotal, setQty, removeItem, clear } = useCart();
   const navigate = useNavigate();
-  const [codigo, setCodigo] = useState("");
-  const [promoMsg, setPromoMsg] = useState("");
 
-  const total = Math.max(0, subtotal - descuentoSoles);
-
-  const aplicarCodigo = () => {
-    const r = applyPromo(codigo);
-    if (r.ok) {
-      setPromoMsg(`✓ ${r.promo.label} aplicado`);
-      setCodigo("");
-    } else {
-      setPromoMsg(r.error);
-    }
-  };
+  const total = subtotal;
 
   if (items.length === 0) {
     return (
@@ -75,48 +62,7 @@ export default function Carrito() {
         ))}
       </div>
 
-      <section className="cart-upsell card card--pad" aria-label="Sugerencias">
-        <p className="cart-upsell__eyebrow">⚡ Completa en un toque</p>
-        <h3 className="cart-upsell__title">¿Bebida o postre para tu Guepardo?</h3>
-        <p className="hint">Los pedidos con bebida salen más rápido de cocina (combo listo).</p>
-        <Link to="/#carta" className="btn btn--outline-dark btn--sm">
-          Ver bebidas y postres
-        </Link>
-      </section>
-
       <div className="cart-summary card card--pad">
-        <div className="cart-promo">
-          <label className="label" htmlFor="promo-code">Código Guepardo</label>
-          <div className="cart-promo__row">
-            <input
-              id="promo-code"
-              type="text"
-              className="input"
-              placeholder="GUEPARDO, VELOZ28…"
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value)}
-            />
-            <button type="button" className="btn btn--surface btn--sm" onClick={aplicarCodigo}>
-              Aplicar
-            </button>
-          </div>
-          {promoMsg && <p className={`cart-promo__msg${promo ? " cart-promo__msg--ok" : ""}`}>{promoMsg}</p>}
-          {promo && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => { clearPromo(); setPromoMsg(""); }}>
-              Quitar {promo.label}
-            </button>
-          )}
-        </div>
-        <div className="cart-summary__row">
-          <span>Subtotal</span>
-          <strong>S/ {subtotal.toFixed(2)}</strong>
-        </div>
-        {descuentoSoles > 0 && (
-          <div className="cart-summary__row cart-summary__row--discount">
-            <span>Descuento {promo?.label}</span>
-            <strong>− S/ {descuentoSoles.toFixed(2)}</strong>
-          </div>
-        )}
         <div className="cart-summary__row cart-summary__row--total">
           <span>Total estimado</span>
           <strong>S/ {total.toFixed(2)}</strong>

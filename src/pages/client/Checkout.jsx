@@ -18,7 +18,7 @@ const METODOS = [
 
 export default function Checkout() {
   const navigate = useNavigate();
-  const { items, subtotal, descuentoSoles, promo, clear } = useCart();
+  const { items, subtotal, clear } = useCart();
 
   const [zonas, setZonas] = useState([]);
   const [sedes, setSedes] = useState([]);
@@ -47,8 +47,7 @@ export default function Checkout() {
     [zonas, direccion.distrito],
   );
   const deliverySoles = zonaSel?.costoSoles ?? 0;
-  const subtotalNeto = Math.max(0, subtotal - descuentoSoles);
-  const total = subtotalNeto + deliverySoles;
+  const total = subtotal + deliverySoles;
   const sedeNombre = sedes.find((s) => s.id === (sedeId || zonaSel?.sedeId))?.nombre || "";
 
   const onLocation = (loc) => {
@@ -158,12 +157,6 @@ export default function Checkout() {
           <aside className="checkout-aside card card--pad">
             <h4>Resumen</h4>
             <div className="cart-summary__row"><span>Subtotal</span><strong>S/ {subtotal.toFixed(2)}</strong></div>
-            {descuentoSoles > 0 && (
-              <div className="cart-summary__row cart-summary__row--discount">
-                <span>{promo?.label || "Descuento"}</span>
-                <strong>− S/ {descuentoSoles.toFixed(2)}</strong>
-              </div>
-            )}
             <div className="cart-summary__row">
               <span>Delivery {direccion.distrito ? `· ${direccion.distrito}` : ""}</span>
               <strong>{zonaSel ? `S/ ${deliverySoles.toFixed(2)}` : "—"}</strong>
@@ -244,12 +237,6 @@ export default function Checkout() {
             <p className="hint">{direccion.calle}, {direccion.distrito}</p>
             <p className="hint">Ref: {direccion.referencia}</p>
             <p className="hint">Contacto: {direccion.celularContacto}</p>
-            {descuentoSoles > 0 && (
-              <div className="cart-summary__row cart-summary__row--discount">
-                <span>Descuento</span>
-                <strong>− S/ {descuentoSoles.toFixed(2)}</strong>
-              </div>
-            )}
             <div className="cart-summary__row cart-summary__row--total" style={{ marginTop: 12 }}>
               <span>Total</span>
               <strong>S/ {total.toFixed(2)}</strong>
